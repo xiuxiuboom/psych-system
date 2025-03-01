@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>心理咨询系统 - 注册</title>
+    <!-- 引入 Bootswatch Cyborg 主题（基于 Bootstrap） -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootswatch/4.5.2/cyborg/bootstrap.min.css">
+    <style>
+        body {
+            background: linear-gradient(to right, #74ebd5, #ACB6E5);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .register-container {
+            background: #fff;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        .register-header {
+            margin-bottom: 30px;
+        }
+
+            .register-header h2 {
+                font-weight: bold;
+                color: #007BFF;
+            }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="register-container mx-auto">
+            <div class="register-header text-center">
+                <h2>注册</h2>
+                <p>创建您的账号，开启心理健康之旅</p>
+            </div>
+            <form id="registerForm">
+                <div class="form-group">
+                    <label for="username">用户名</label>
+                    <input type="text" id="username" name="username" class="form-control" placeholder="请输入用户名" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">密码</label>
+                    <input type="password" id="password" name="password" class="form-control" placeholder="请输入密码" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">邮箱</label>
+                    <input type="email" id="email" name="email" class="form-control" placeholder="请输入邮箱" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">注册</button>
+            </form>
+            <div class="text-center mt-3">
+                <p>已有账号？ <a href="login.html">登录</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入 jQuery, Popper.js 和 Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootswatch/4.5.2/bootstrap.min.js"></script>
+
+    <script>
+    // 注册表单提交处理逻辑
+    document.getElementById('registerForm').addEventListener('submit', async function(e) {
+      e.preventDefault(); // 阻止默认提交行为
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const email = document.getElementById('email').value;
+
+      // 发送 POST 请求到后端注册接口
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, email })
+      });
+      const result = await response.json();
+
+      if (response.ok) {
+        // 注册成功后，提示并跳转到登录页面
+        alert('注册成功！请登录。');
+        window.location.href = 'login.html';
+      } else {
+        // 注册失败时弹出错误信息
+        alert('注册失败: ' + (result.error || '未知错误'));
+      }
+    });
+    </script>
+</body>
+</html>

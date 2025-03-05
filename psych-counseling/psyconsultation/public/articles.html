@@ -2,15 +2,84 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>文章</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>文章 - 心理咨询系统</title>
+    <!-- Bootswatch Cosmo 主题 -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootswatch/4.5.2/cosmo/bootstrap.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <h2>心理健康文章</h2>
-        <ul id="articleList"></ul>
-    </div>
-    <script src="script.js"></script>
+    <!-- 导航栏（与首页保持一致） -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <a class="navbar-brand" href="index.html">心理咨询中心</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarContent"
+                aria-controls="navbarContent" aria-expanded="false" aria-label="切换导航">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarContent">
+            <ul class="navbar-nav mr-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="index.html">首页</a>
+                </li>
+                <li class="nav-item active">
+                    <a class="nav-link" href="articles.html">文章</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">关于我们</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">联系我们</a>
+                </li>
+            </ul>
+            <!-- 如有需要，可在此处添加用户信息和退出登录功能 -->
+        </div>
+    </nav>
+
+    <!-- 文章列表区域 -->
+    <section class="container my-5">
+        <h2 class="mb-4 text-center">全部文章</h2>
+        <div id="articlesContainer" class="row">
+            <!-- 文章卡片将动态生成在这里 -->
+        </div>
+    </section>
+
+    <!-- 页脚 -->
+    <footer class="bg-primary text-white text-center py-3">
+        <div class="container">
+            <p class="mb-0">&copy; 2025 心理咨询中心. 版权所有.</p>
+        </div>
+    </footer>
+
+    <!-- 引入 jQuery, Popper.js, Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // 调用后端接口获取文章列表数据
+        // 动态获取所有文章列表，并生成文章卡片
+        fetch('/api/articles')
+            .then(response => response.json())
+            .then(data => {
+                const container = document.getElementById('articlesContainer');
+                container.innerHTML = '';  // 清空容器内容
+                data.forEach(article => {
+                    const cardHTML = `
+        <div class="col-md-4">
+          <div class="card mb-4">
+            <img src="${article.image_url}" class="card-img-top" alt="文章封面">
+            <div class="card-body">
+              <h5 class="card-title">${article.title}</h5>
+              <a href="article.html?id=${article.id}" class="btn btn-primary">阅读全文</a>
+            </div>
+          </div>
+        </div>
+      `;
+                    container.insertAdjacentHTML('beforeend', cardHTML);
+                });
+            })
+            .catch(error => console.error('加载文章列表出错:', error));
+
+    </script>
 </body>
 </html>

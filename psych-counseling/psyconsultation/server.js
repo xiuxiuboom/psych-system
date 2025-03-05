@@ -3,146 +3,206 @@ const express = require('express');
 const mysql = require('mysql2');
 const socketIo = require('socket.io');
 const http = require('http');
-const bcrypt = require('bcrypt');  // ÓÃÓÚ¼ÓÃÜºÍ±È½ÏÃÜÂë
+const bcrypt = require('bcrypt');  // ç”¨äºŽåŠ å¯†å’Œæ¯”è¾ƒå¯†ç 
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// Á¬½Óµ½ MySQL Êý¾Ý¿â
+
+
+
+// è¿žæŽ¥åˆ° MySQL æ•°æ®åº“
 const db = mysql.createConnection({
     host: 'localhost',
-    user: 'root',       // ÄãµÄ MySQL ÓÃ»§Ãû
-    password: '123456',       // ÄãµÄ MySQL ÃÜÂë
-    database: 'psyconsultation'  // ÄãµÄÊý¾Ý¿âÃû
+    user: 'root',       // ä½ çš„ MySQL ç”¨æˆ·å
+    password: '123456',       // ä½ çš„ MySQL å¯†ç 
+    database: 'psyconsultation'  // ä½ çš„æ•°æ®åº“å
 });
 
 db.connect((err) => {
     if (err) throw err;
-    console.log('Êý¾Ý¿âÁ¬½Ó³É¹¦');
+    console.log('æ•°æ®åº“è¿žæŽ¥æˆåŠŸ');
 });
-// ÉèÖÃ¾²Ì¬ÎÄ¼þ¼Ð£¬Ìá¹©Ç°¶ËÎÄ¼þ
+
+// é’ˆå¯¹ .html æ–‡ä»¶è®¾ç½® Content-Type ä¸º text/html; charset=UTF-8
+app.use((req, res, next) => {
+    if (req.url.endsWith('.html')) {
+        res.setHeader('Content-Type', 'text/html; charset=UTF-8');
+    }
+    next();
+});
+
+// è®¾ç½®é™æ€æ–‡ä»¶å¤¹ï¼Œæä¾›å‰ç«¯æ–‡ä»¶
 app.use(express.static('public'));
 
-// ÉèÖÃ½âÎö POST ÇëÇóµÄ JSON Êý¾Ý£¬²¢ÉèÖÃ½ÓÊÕ´óÐ¡ÏÞÖÆ
+// è®¾ç½®è§£æž POST è¯·æ±‚çš„ JSON æ•°æ®ï¼Œå¹¶è®¾ç½®æŽ¥æ”¶å¤§å°é™åˆ¶
 app.use(express.json({ limit: '10mb' }));
 
-// Ö÷Ò³Â·ÓÉ£ºÕâ»á·¢ËÍ HTML ÎÄ¼þ£¬Content-Type »á×Ô¶¯ÉèÖÃÎª text/html
+// ä¸»é¡µè·¯ç”±ï¼šè¿™ä¼šå‘é€ HTML æ–‡ä»¶ï¼ŒContent-Type ä¼šè‡ªåŠ¨è®¾ç½®ä¸º text/html
 app.get('/', (req, res) => {
     res.sendFile(__dirname + '/public/index.html');
 });
 
-// Õë¶Ô /api Â·ÓÉÉèÖÃÏìÓ¦Í·£¬È·±£ËùÓÐ API ÏìÓ¦¶¼Ê¹ÓÃ UTF-8 ±àÂë
+// é’ˆå¯¹ /api è·¯ç”±è®¾ç½®å“åº”å¤´ï¼Œç¡®ä¿æ‰€æœ‰ API å“åº”éƒ½ä½¿ç”¨ UTF-8 ç¼–ç 
 app.use('/api', (req, res, next) => {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     next();
 });
 
 
-// µÇÂ¼½Ó¿Ú
+// ç™»å½•æŽ¥å£
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
 
-    // ²éÑ¯Êý¾Ý¿â»ñÈ¡ÓÃ»§ÃûºÍ¼ÓÃÜºóµÄÃÜÂë
+    // æŸ¥è¯¢æ•°æ®åº“èŽ·å–ç”¨æˆ·åå’ŒåŠ å¯†åŽçš„å¯†ç 
     db.query('SELECT * FROM users WHERE username = ?', [username], (err, results) => {
         if (err) {
-            console.error('Êý¾Ý¿â²éÑ¯´íÎó:', err);
-            return res.status(500).json({ error: 'Êý¾Ý¿â²éÑ¯Ê§°Ü' });
+            console.error('æ•°æ®åº“æŸ¥è¯¢é”™è¯¯:', err);
+            return res.status(500).json({ error: 'æ•°æ®åº“æŸ¥è¯¢å¤±è´¥' });
         }
 
         if (results.length === 0) {
-            return res.status(400).json({ error: 'ÓÃ»§Ãû²»´æÔÚ' });
+            return res.status(400).json({ error: 'ç”¨æˆ·åä¸å­˜åœ¨' });
         }
 
         const user = results[0];
 
-        // Ê¹ÓÃ bcrypt ±È¶ÔÃÜÂë
+        // ä½¿ç”¨ bcrypt æ¯”å¯¹å¯†ç 
         bcrypt.compare(password, user.password, (err, result) => {
             if (err) {
-                console.error('ÃÜÂë±È¶ÔÊ§°Ü:', err);
-                return res.status(500).json({ error: 'ÃÜÂë±È¶ÔÊ§°Ü' });
+                console.error('å¯†ç æ¯”å¯¹å¤±è´¥:', err);
+                return res.status(500).json({ error: 'å¯†ç æ¯”å¯¹å¤±è´¥' });
             }
             if (result) {
                 res.json({ success: true, user: user });
             } else {
-                res.status(400).json({ error: 'ÃÜÂë´íÎó' });
+                res.status(400).json({ error: 'å¯†ç é”™è¯¯' });
             }
         });
     });
 });
 
-// ÓÃ»§×¢²á½Ó¿Ú
+// ç”¨æˆ·æ³¨å†ŒæŽ¥å£
 app.post('/api/register', (req, res) => {
     const { username, password, email } = req.body;
 
-    // ¼ÓÃÜÃÜÂë
+    // åŠ å¯†å¯†ç 
     bcrypt.hash(password, 10, (err, hashedPassword) => {
         if (err) {
-            return res.status(500).json({ error: 'ÃÜÂë¼ÓÃÜÊ§°Ü' });
+            return res.status(500).json({ error: 'å¯†ç åŠ å¯†å¤±è´¥' });
         }
 
-        // ½«¼ÓÃÜºóµÄÃÜÂë´æÈëÊý¾Ý¿â
+        // å°†åŠ å¯†åŽçš„å¯†ç å­˜å…¥æ•°æ®åº“
         db.query('INSERT INTO users (username, password, email) VALUES (?, ?, ?)',
             [username, hashedPassword, email], (err, results) => {
                 if (err) {
-                    return res.status(500).json({ error: '×¢²áÊ§°Ü' });
+                    return res.status(500).json({ error: 'æ³¨å†Œå¤±è´¥' });
                 }
                 return res.json({ success: true });
             });
     });
 });
 
-// Ä£ÄâÐÄÀíÓïÂ¼Êý¾Ý
-const quotes = [
-    "Ã¿Ìì¶¼ÊÇÐÂµÄ¿ªÊ¼£¬±£³Ö»ý¼«£¬±£³ÖÀÖ¹Û£¡",
-    "Éú»îÖÐµÄÃ¿¸öÌôÕ½¶¼ÊÇÒ»´Î³É³¤µÄ»ú»á¡£",
-    "ÏàÐÅ×Ô¼º£¬ÄãµÄÅ¬Á¦»á´øÀ´¸Ä±ä¡£",
-    "²»ÒªÎª½ñÌìµÄÀ§ÄÑ¸Ðµ½ÆøÄÙ£¬Î´À´³äÂúÏ£Íû¡£",
-    "»ý¼«µÄÐÄÌ¬ÊÇ³É¹¦µÄÒ»°ë¡£",
-];
-
-// »ñÈ¡Ã¿ÌìµÄÐÄÀíÓïÂ¼,Ìí¼ÓÒ»¸öÐÂµÄÂ·ÓÉ£¬·µ»ØÒ»¸öËæ»úµÄÐÄÀíÓïÂ¼¡£
 app.get('/api/quote', (req, res) => {
-    const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
-    res.json({ quote: randomQuote });
+    db.query('SELECT content FROM quotes ORDER BY RAND() LIMIT 1', (err, results) => {
+        if (err) {
+            console.error('æŸ¥è¯¢è¯­å½•å¤±è´¥:', err);
+            return res.status(500).json({ error: 'æŸ¥è¯¢è¯­å½•å¤±è´¥' });
+        }
+        if (results.length === 0) {
+            return res.status(404).json({ error: 'æš‚æ— è¯­å½•' });
+        }
+        res.json({ quote: results[0].content });
+    });
 });
 
-// ÄäÃûÁôÑÔÇ½
-let messages = [];  // ´æ´¢ÁôÑÔµÄÊý×é
 
-// ºÏ²¢ WebSocket Á¬½Ó´¦ÀíÂß¼­
+// åŒ¿åç•™è¨€å¢™
+let messages = [];  // å­˜å‚¨ç•™è¨€çš„æ•°ç»„
+
+// åˆå¹¶ WebSocket è¿žæŽ¥å¤„ç†é€»è¾‘
 io.on('connection', (socket) => {
-    console.log('ÓÃ»§Á¬½Ó');
+    console.log('ç”¨æˆ·è¿žæŽ¥');
 
-    // ·¢ËÍÀúÊ·ÏûÏ¢¸øÐÂÁ¬½ÓµÄÓÃ»§
+    // å‘é€åŽ†å²æ¶ˆæ¯ç»™æ–°è¿žæŽ¥çš„ç”¨æˆ·
     socket.emit('previousMessages', messages);
 
-    // ¼àÌýÓÃ»§·¢ËÍµÄÁôÑÔ
+    // ç›‘å¬ç”¨æˆ·å‘é€çš„ç•™è¨€
     socket.on('sendMessage', (message) => {
         messages.push(message);
-        io.emit('newMessage', message);  // ¹ã²¥¸øËùÓÐÓÃ»§
+        io.emit('newMessage', message);  // å¹¿æ’­ç»™æ‰€æœ‰ç”¨æˆ·
     });
 
-    // Ô­ÓÐµÄÊµÊ±ÁÄÌìÂß¼­
+    // åŽŸæœ‰çš„å®žæ—¶èŠå¤©é€»è¾‘
     socket.on('message', (msg) => {
-        io.emit('message', msg);  // ¹ã²¥ÏûÏ¢¸øËùÓÐÁ¬½ÓµÄÓÃ»§
+        io.emit('message', msg);  // å¹¿æ’­æ¶ˆæ¯ç»™æ‰€æœ‰è¿žæŽ¥çš„ç”¨æˆ·
     });
 });
 
-// Ä£ÄâµÄÎÄÕÂÊý¾Ý
-const articles = [
-    { title: "ÈçºÎ±£³ÖÐÄÀí½¡¿µ", content: "ÐÄÀí½¡¿µÊÇÉú»îÖÐ×îÖØÒªµÄÒ»²¿·Ö..." },
-    { title: "Ñ¹Á¦¹ÜÀí¼¼ÇÉ", content: "Ñ§Ï°ÈçºÎ¹ÜÀíÑ¹Á¦ÄÜ°ïÖúÄã±£³ÖÀä¾²..." },
-    { title: "»ý¼«ÐÄÌ¬µÄÖØÒªÐÔ", content: "»ý¼«ÐÄÌ¬ÄÜ¹»ÌáÉýÉú»îÖÊÁ¿..." },
-];
-
-// »ñÈ¡ÎÄÕÂÁÐ±í
+// ç²¾é€‰æ–‡ç« 
 app.get('/api/articles', (req, res) => {
-    res.json(articles);
+    let query = 'SELECT id, title, image_url FROM articles ORDER BY created_at DESC';
+    // å¦‚æžœè¯·æ±‚ä¸­æä¾›äº† limit å‚æ•°ï¼Œåˆ™æ·»åŠ  LIMIT å­å¥
+    if (req.query.limit) {
+        const limit = parseInt(req.query.limit);
+        if (!isNaN(limit) && limit > 0) {
+            query += ' LIMIT ' + limit;
+        }
+    }
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('æŸ¥è¯¢æ–‡ç« åˆ—è¡¨é”™è¯¯:', err);
+            return res.status(500).json({ error: 'æ— æ³•èŽ·å–æ–‡ç« åˆ—è¡¨' });
+        }
+        res.json(results);
+    });
 });
 
-// Æô¶¯·þÎñÆ÷
+
+
+
+// èŽ·å–å•ä¸ªæ–‡ç« è¯¦æƒ…
+app.get('/api/article', (req, res) => {
+    const id = parseInt(req.query.id);
+    db.query('SELECT id, title, content, image_url FROM articles WHERE id = ?', [id], (err, results) => {
+        if (err) {
+            console.error('æŸ¥è¯¢æ–‡ç« è¯¦æƒ…é”™è¯¯:', err);
+            return res.status(500).json({ error: 'æŸ¥è¯¢æ–‡ç« å¤±è´¥' });
+        }
+        if (results.length === 0) {
+            return res.status(404).json({ error: 'æ–‡ç« æœªæ‰¾åˆ°' });
+        }
+        res.json(results[0]);
+    });
+});
+
+app.get('/api/announcements', (req, res) => {
+    db.query('SELECT * FROM announcements ORDER BY created_at DESC', (err, results) => {
+        if (err) {
+            console.error('æŸ¥è¯¢å…¬å‘Šåˆ—è¡¨é”™è¯¯:', err);
+            return res.status(500).json({ error: 'æ— æ³•èŽ·å–å…¬å‘Šåˆ—è¡¨' });
+        }
+        res.json(results);
+    });
+});
+
+app.get('/api/announcement', (req, res) => {
+    const id = parseInt(req.query.id);
+    db.query('SELECT * FROM announcements WHERE id = ?', [id], (err, results) => {
+        if (err) {
+            console.error('æŸ¥è¯¢å…¬å‘Šè¯¦æƒ…é”™è¯¯:', err);
+            return res.status(500).json({ error: 'æŸ¥è¯¢å…¬å‘Šå¤±è´¥' });
+        }
+        if (results.length === 0) {
+            return res.status(404).json({ error: 'å…¬å‘Šæœªæ‰¾åˆ°' });
+        }
+        res.json(results[0]);
+    });
+});
+
+// å¯åŠ¨æœåŠ¡å™¨
 const PORT = 3000;
 server.listen(PORT, () => {
-    console.log(`·þÎñÆ÷ÒÑÆô¶¯£¬·ÃÎÊÍøÖ·£ºhttp://localhost:${PORT}`);
+    console.log(`æœåŠ¡å™¨å·²å¯åŠ¨ï¼Œè®¿é—®ç½‘å€ï¼šhttp://localhost:${PORT}`);
 });

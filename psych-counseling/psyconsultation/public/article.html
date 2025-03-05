@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>文章详情 - 心理咨询系统</title>
+    <!-- Bootswatch Cosmo 主题 -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootswatch/4.5.2/cosmo/bootstrap.min.css">
+    <link rel="stylesheet" href="style.css">
+    <!-- 使用 unpkg 的 Marked.js -->
+    <script src="https://unpkg.com/marked/marked.min.js"></script>
+</head>
+<body>
+    <!-- 导航栏（与首页保持一致） -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <a class="navbar-brand" href="index.html">心理咨询中心</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarContent"
+                aria-controls="navbarContent" aria-expanded="false" aria-label="切换导航">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarContent">
+            <ul class="navbar-nav mr-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="index.html">首页</a>
+                </li>
+            </ul>
+            <!-- 可添加用户信息和退出登录功能 -->
+        </div>
+    </nav>
+
+    <!-- 文章详情内容区 -->
+    <div class="container my-5">
+        <h2 id="articleTitle" class="mb-4 text-center">文章标题</h2>
+        <div id="articleContent" class="mb-5">
+            <!-- 文章内容会动态填充 -->
+        </div>
+        <div class="text-center">
+            <a href="index.html" class="btn btn-secondary">返回首页</a>
+        </div>
+    </div>
+
+    <!-- 页脚 -->
+    <footer class="bg-primary text-white text-center py-3">
+        <div class="container">
+            <p class="mb-0">&copy; 2025 心理咨询中心. 版权所有.</p>
+        </div>
+    </footer>
+
+    <!-- 引入 jQuery, Popper.js, Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // 从 URL 获取文章 id
+        const urlParams = new URLSearchParams(window.location.search);
+        const articleId = urlParams.get('id');
+
+        if (!articleId) {
+            document.getElementById('articleContent').innerHTML = '<p>无效的文章 ID</p>';
+        } else {
+            // 调用后端 API 获取文章详情，注意这里使用模板字符串
+            fetch(`/api/article?id=${articleId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        // 如果返回了错误信息，则显示错误
+                        document.getElementById('articleContent').innerHTML = `<p>${data.error}</p>`;
+                    } else {
+                        document.getElementById('articleTitle').textContent = data.title;
+                        // 使用 Marked.js 将 Markdown 转换为 HTML，使用 marked.parse()
+                        document.getElementById('articleContent').innerHTML = marked.parse(data.content);
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('articleContent').innerHTML = `<p>加载文章失败，请重试</p>`;
+                    console.error('Error:', error);
+                });
+        }
+    </script>
+
+</body>
+</html>

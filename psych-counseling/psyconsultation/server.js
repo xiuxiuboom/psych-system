@@ -104,19 +104,89 @@ app.post('/api/register', (req, res) => {
     });
 });
 
-app.get('/api/quote', (req, res) => {
-    db.query('SELECT content FROM quotes ORDER BY RAND() LIMIT 1', (err, results) => {
+app.get('/api/quotes', (req, res) => {
+    db.query('SELECT * FROM quotes ORDER BY created_at DESC', (err, results) => {
         if (err) {
-            console.error('查询语录失败:', err);
-            return res.status(500).json({ error: '查询语录失败' });
+            console.error('查询心理语录列表错误:', err);
+            return res.status(500).json({ error: '无法获取心理语录列表' });
         }
-        if (results.length === 0) {
-            return res.status(404).json({ error: '暂无语录' });
-        }
-        res.json({ quote: results[0].content });
+        res.json(results);
     });
 });
 
+app.get('/api/quote', (req, res) => {
+    if (req.query.id) {
+        // 如果传入 id 参数，则查询对应语录的完整记录
+        const id = parseInt(req.query.id);
+        db.query('SELECT * FROM quotes WHERE id = ?', [id], (err, results) => {
+            if (err) {
+                console.error('查询语录详情错误:', err);
+                return res.status(500).json({ error: '查询语录失败' });
+            }
+            if (results.length === 0) {
+                return res.status(404).json({ error: '语录未找到' });
+            }
+            res.json(results[0]);
+        });
+    } else {
+        // 如果没有传入 id，则返回随机语录（仅返回内容）
+        db.query('SELECT content FROM quotes ORDER BY RAND() LIMIT 1', (err, results) => {
+            if (err) {
+                console.error('查询语录失败:', err);
+                return res.status(500).json({ error: '查询语录失败' });
+            }
+            if (results.length === 0) {
+                return res.status(404).json({ error: '暂无语录' });
+            }
+            res.json({ quote: results[0].content });
+        });
+    }
+});
+
+//添加心理语录
+app.post('/api/quote', (req, res) => {
+    const { content } = req.body;
+    if (!content) {
+        return res.status(400).json({ error: '语录内容不能为空' });
+    }
+    db.query('INSERT INTO quotes (content) VALUES (?)', [content], (err, results) => {
+        if (err) {
+            console.error('添加心理语录失败:', err);
+            return res.status(500).json({ error: '添加心理语录失败' });
+        }
+        res.json({ success: true, quoteId: results.insertId });
+    });
+});
+
+//修改心理语录
+app.put('/api/quote', (req, res) => {
+    const { id, content } = req.body;
+    if (!id || !content) {
+        return res.status(400).json({ error: '语录ID和内容不能为空' });
+    }
+    db.query('UPDATE quotes SET content = ? WHERE id = ?', [content, id], (err, results) => {
+        if (err) {
+            console.error('更新心理语录失败:', err);
+            return res.status(500).json({ error: '更新心理语录失败' });
+        }
+        res.json({ success: true });
+    });
+});
+
+//删除心理语录
+app.delete('/api/quote', (req, res) => {
+    const id = parseInt(req.query.id);
+    if (!id) {
+        return res.status(400).json({ error: '语录ID不能为空' });
+    }
+    db.query('DELETE FROM quotes WHERE id = ?', [id], (err, results) => {
+        if (err) {
+            console.error('删除心理语录失败:', err);
+            return res.status(500).json({ error: '删除心理语录失败' });
+        }
+        res.json({ success: true });
+    });
+});
 
 // 匿名留言墙
 let messages = [];  // 存储留言的数组
@@ -125,20 +195,121 @@ let messages = [];  // 存储留言的数组
 io.on('connection', (socket) => {
     console.log('用户连接');
 
-    // 发送历史消息给新连接的用户
-    socket.emit('previousMessages', messages);
+    // 从数据库中查询留言记录，并发送给新连接的用户
+    db.query('SELECT * FROM messages ORDER BY created_at ASC', (err, results) => {
+        if (err) {
+            console.error('查询留言失败:', err);
+        } else {
+            socket.emit('previousMessages', results);
+        }
+    });
 
     // 监听用户发送的留言
     socket.on('sendMessage', (message) => {
-        messages.push(message);
-        io.emit('newMessage', message);  // 广播给所有用户
-    });
-
-    // 原有的实时聊天逻辑
-    socket.on('message', (msg) => {
-        io.emit('message', msg);  // 广播消息给所有连接的用户
+        // 将留言插入到数据库
+        db.query('INSERT INTO messages (content) VALUES (?)', [message], (err, results) => {
+            if (err) {
+                console.error('保存留言失败:', err);
+            } else {
+                // 查询刚插入的留言记录（包含生成的 id 和 created_at）
+                db.query('SELECT * FROM messages WHERE id = ?', [results.insertId], (err, results2) => {
+                    if (err) {
+                        console.error('查询新留言失败:', err);
+                    } else {
+                        const newMessage = results2[0];
+                        // 广播这条新留言给所有客户端
+                        io.emit('newMessage', newMessage);
+                    }
+                });
+            }
+        });
     });
 });
+
+//管理员查看留言
+app.get('/api/messages', (req, res) => {
+    db.query('SELECT * FROM messages ORDER BY created_at ASC', (err, results) => {
+        if (err) {
+            console.error('查询留言列表错误:', err);
+            return res.status(500).json({ error: '无法获取留言列表' });
+        }
+        res.json(results);
+    });
+});
+
+//管理员删除留言
+app.delete('/api/message', (req, res) => {
+    const id = parseInt(req.query.id);
+    if (!id) {
+        return res.status(400).json({ error: '留言ID不能为空' });
+    }
+    db.query('DELETE FROM messages WHERE id = ?', [id], (err, results) => {
+        if (err) {
+            console.error('删除留言失败:', err);
+            return res.status(500).json({ error: '删除留言失败' });
+        }
+        res.json({ success: true });
+    });
+});
+
+//返回所有用户的基本信息和身份（供管理员查看）。
+app.get('/api/users', (req, res) => {
+    db.query('SELECT id, username, email, role FROM users', (err, results) => {
+        if (err) {
+            console.error('查询用户列表错误:', err);
+            return res.status(500).json({ error: '无法获取用户列表' });
+        }
+        res.json(results);
+    });
+});
+
+app.put('/api/user', (req, res) => {
+    const { id, role } = req.body;
+    // 验证 role 合法性
+    if (!['普通用户', '心理医生', '管理员'].includes(role)) {
+        return res.status(400).json({ error: '无效的用户身份' });
+    }
+    db.query('UPDATE users SET role = ? WHERE id = ?', [role, id], (err, results) => {
+        if (err) {
+            console.error('更新用户身份失败:', err);
+            return res.status(500).json({ error: '更新用户身份失败' });
+        }
+        res.json({ success: true });
+    });
+});
+
+// 管理员登录接口
+app.post('/api/admin/login', (req, res) => {
+    const { username, password } = req.body;
+
+    // 查询数据库中该用户名的用户信息
+    db.query('SELECT * FROM users WHERE username = ?', [username], (err, results) => {
+        if (err) {
+            console.error('管理员登录查询错误:', err);
+            return res.status(500).json({ error: '数据库查询失败' });
+        }
+        if (results.length === 0) {
+            return res.status(400).json({ error: '用户名不存在' });
+        }
+        const user = results[0];
+        // 使用 bcrypt 比对密码
+        bcrypt.compare(password, user.password, (err, match) => {
+            if (err) {
+                console.error('密码比对失败:', err);
+                return res.status(500).json({ error: '密码比对失败' });
+            }
+            if (!match) {
+                return res.status(400).json({ error: '密码错误' });
+            }
+            // 检查用户角色是否为管理员
+            if (user.role !== '管理员') {
+                return res.status(403).json({ error: '无管理员权限' });
+            }
+            res.json({ success: true, user });
+        });
+    });
+});
+
 
 // 精选文章
 app.get('/api/articles', (req, res) => {
@@ -176,6 +347,60 @@ app.get('/api/article', (req, res) => {
         res.json(results[0]);
     });
 });
+
+//管理员通过该接口添加文章
+app.post('/api/article', (req, res) => {
+    const { title, content, image_url } = req.body;
+    if (!title || !content) {
+        return res.status(400).json({ error: '文章标题和内容不能为空' });
+    }
+    db.query(
+        'INSERT INTO articles (title, content, image_url) VALUES (?, ?, ?)',
+        [title, content, image_url],
+        (err, results) => {
+            if (err) {
+                console.error('添加文章失败:', err);
+                return res.status(500).json({ error: '添加文章失败' });
+            }
+            res.json({ success: true, articleId: results.insertId });
+        }
+    );
+});
+
+//管理员通过该接口更新文章内容
+app.put('/api/article', (req, res) => {
+    const { id, title, content, image_url } = req.body;
+    if (!id || !title || !content) {
+        return res.status(400).json({ error: '文章ID、标题和内容不能为空' });
+    }
+    db.query(
+        'UPDATE articles SET title = ?, content = ?, image_url = ? WHERE id = ?',
+        [title, content, image_url, id],
+        (err, results) => {
+            if (err) {
+                console.error('更新文章失败:', err);
+                return res.status(500).json({ error: '更新文章失败' });
+            }
+            res.json({ success: true });
+        }
+    );
+});
+
+//管理员删除文章
+app.delete('/api/article', (req, res) => {
+    const id = parseInt(req.query.id);
+    if (!id) {
+        return res.status(400).json({ error: '文章ID不能为空' });
+    }
+    db.query('DELETE FROM articles WHERE id = ?', [id], (err, results) => {
+        if (err) {
+            console.error('删除文章失败:', err);
+            return res.status(500).json({ error: '删除文章失败' });
+        }
+        res.json({ success: true });
+    });
+});
+
 
 app.get('/api/announcements', (req, res) => {
     db.query('SELECT * FROM announcements ORDER BY created_at DESC', (err, results) => {

@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>管理员后台 - 文章管理 - 心理咨询系统</title>
+    <!-- 使用 Bootswatch Cosmo 主题 -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootswatch/4.5.2/cosmo/bootstrap.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <a class="navbar-brand" href="admin.html">管理员后台</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarContentAdmin"
+                aria-controls="navbarContentAdmin" aria-expanded="false" aria-label="切换导航">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarContentAdmin">
+            <ul class="navbar-nav mr-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="admin.html">用户管理</a>
+                </li>
+                <li class="nav-item active">
+                    <a class="nav-link" href="adminArticles.html">文章管理</a>
+                </li>
+                <!-- 其他管理功能 -->
+            </ul>
+            <ul class="navbar-nav ml-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="#" id="adminLogoutBtn">退出</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container my-5">
+        <h2 class="text-center">文章管理</h2>
+        <!-- 按钮：添加新文章 -->
+        <div class="mb-3 text-right">
+            <button class="btn btn-success" id="addArticleBtn">添加新文章</button>
+        </div>
+        <!-- 文章列表表格 -->
+        <table class="table table-striped" id="articlesTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>标题</th>
+                    <th>封面</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- 文章数据将动态生成 -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 模态框：用于添加/编辑文章 -->
+    <div class="modal fade" id="articleModal" tabindex="-1" role="dialog" aria-labelledby="articleModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <form id="articleForm">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="articleModalLabel">添加/编辑文章</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="关闭">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="articleId">
+                        <div class="form-group">
+                            <label for="articleTitleInput">标题</label>
+                            <input type="text" class="form-control" id="articleTitleInput" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="articleContentInput">内容 (支持 Markdown)</label>
+                            <textarea class="form-control" id="articleContentInput" rows="6" required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="articleImageUrlInput">封面图片 URL</label>
+                            <input type="text" class="form-control" id="articleImageUrlInput">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
+                        <button type="submit" class="btn btn-primary">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 页脚 -->
+    <footer class="bg-primary text-white text-center py-3">
+        <div class="container">
+            <p class="mb-0">&copy; 2025 心理咨询中心. 版权所有.</p>
+        </div>
+    </footer>
+
+    <!-- 引入 jQuery, Popper.js, Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+    // 检查管理员登录状态
+    if (!localStorage.getItem('isAdmin')) {
+      window.location.href = 'adminLogin.html';
+    }
+
+    // 管理员退出登录
+    document.getElementById('adminLogoutBtn').addEventListener('click', function (e) {
+      e.preventDefault();
+      localStorage.removeItem('isAdmin');
+      window.location.href = 'adminLogin.html';
+    });
+
+    // 加载所有文章数据
+    function loadArticles() {
+      fetch('/api/articles')
+        .then(response => response.json())
+        .then(data => {
+          const tbody = document.querySelector('#articlesTable tbody');
+          tbody.innerHTML = '';
+          data.forEach(article => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${article.id}</td>
+              <td>${article.title}</td>
+              <td><img src="${article.image_url}" alt="封面" style="height:50px;"></td>
+              <td>
+                <button class="btn btn-sm btn-primary edit-btn" data-id="${article.id}">编辑</button>
+                <button class="btn btn-sm btn-danger delete-btn" data-id="${article.id}">删除</button>
+              </td>
+            `;
+            tbody.appendChild(row);
+          });
+
+          // 为编辑和删除按钮绑定事件
+          document.querySelectorAll('.edit-btn').forEach(button => {
+            button.addEventListener('click', function () {
+              const id = this.getAttribute('data-id');
+              editArticle(id);
+            });
+          });
+          document.querySelectorAll('.delete-btn').forEach(button => {
+            button.addEventListener('click', function () {
+              const id = this.getAttribute('data-id');
+              if (confirm('确定要删除该文章吗？')) {
+                deleteArticle(id);
+              }
+            });
+          });
+        })
+        .catch(error => console.error('加载文章数据出错:', error));
+    }
+
+    // 打开模态框用于添加文章
+    document.getElementById('addArticleBtn').addEventListener('click', function () {
+      document.getElementById('articleForm').reset();
+      document.getElementById('articleId').value = '';  // 清空隐藏字段，表示新文章
+      document.getElementById('articleModalLabel').textContent = '添加文章';
+      $('#articleModal').modal('show');
+    });
+
+    // 编辑文章：加载文章详情到表单中
+    function editArticle(articleId) {
+      fetch('/api/article?id=' + articleId)
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById('articleId').value = data.id;
+          document.getElementById('articleTitleInput').value = data.title;
+          document.getElementById('articleContentInput').value = data.content;
+          document.getElementById('articleImageUrlInput').value = data.image_url;
+          document.getElementById('articleModalLabel').textContent = '编辑文章';
+          $('#articleModal').modal('show');
+        })
+        .catch(error => console.error('加载文章详情出错:', error));
+    }
+
+    // 删除文章
+    function deleteArticle(articleId) {
+      fetch('/api/article?id=' + articleId, {
+        method: 'DELETE'
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            alert('文章删除成功');
+            loadArticles();
+          } else {
+            alert('删除失败: ' + (data.error || '未知错误'));
+          }
+        })
+        .catch(error => {
+          console.error('删除文章失败:', error);
+          alert('删除文章失败');
+        });
+    }
+
+    // 表单提交处理：用于添加或更新文章
+    document.getElementById('articleForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const id = document.getElementById('articleId').value;
+      const title = document.getElementById('articleTitleInput').value.trim();
+      const content = document.getElementById('articleContentInput').value.trim();
+      const image_url = document.getElementById('articleImageUrlInput').value.trim();
+
+      if (!title || !content) {
+        alert('标题和内容不能为空');
+        return;
+      }
+
+      const payload = { title, content, image_url };
+
+      if (id) {
+        // 更新文章
+        payload.id = id;
+        fetch('/api/article', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              alert('文章更新成功');
+              $('#articleModal').modal('hide');
+              loadArticles();
+            } else {
+              alert('更新失败: ' + (data.error || '未知错误'));
+            }
+          })
+          .catch(error => {
+            console.error('更新文章失败:', error);
+            alert('更新文章失败');
+          });
+      } else {
+        // 添加新文章
+        fetch('/api/article', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              alert('文章添加成功');
+              $('#articleModal').modal('hide');
+              loadArticles();
+            } else {
+              alert('添加失败: ' + (data.error || '未知错误'));
+            }
+          })
+          .catch(error => {
+            console.error('添加文章失败:', error);
+            alert('添加文章失败');
+          });
+      }
+    });
+
+    // 初始加载文章数据
+    loadArticles();
+    </script>
+</body>
+</html>

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>匿名留言墙 - 心理咨询系统</title>
+    <!-- 使用 Bootswatch Cosmo 主题 -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootswatch/4.5.2/cosmo/bootstrap.min.css">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* 弹幕容器：覆盖整个屏幕，透明背景，不影响下层点击 */
+        #bulletContainer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 9999;
+        }
+        /* 弹幕消息的基本样式 */
+        .bullet-message {
+            position: absolute;
+            white-space: nowrap;
+            font-size: 16px;
+            color: #fff;
+            text-shadow: 1px 1px 2px #000;
+            animation: fly 15s linear;
+        }
+        /* 定义从右向左飞的动画，使用视口宽度 */
+        @keyframes fly {
+            from {
+                transform: translateX(100vw);
+            }
+
+            to {
+                transform: translateX(-100vw);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏（与首页一致） -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <a class="navbar-brand" href="index.html">心理咨询中心</a>
+        <!-- 其他导航项可根据需要添加 -->
+    </nav>
+
+    <!-- 留言输入区域 -->
+    <div class="container my-5">
+        <h2 class="text-center">匿名留言墙</h2>
+        <div class="input-group mb-3">
+            <input type="text" id="messageInput" class="form-control" placeholder="请输入留言">
+            <div class="input-group-append">
+                <button id="sendMessageBtn" class="btn btn-primary">发送留言</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 弹幕容器 -->
+    <div id="bulletContainer"></div>
+
+    <!-- 页脚 -->
+    <footer class="bg-primary text-white text-center py-3">
+        <div class="container">
+            <p class="mb-0">&copy; 2025 心理咨询中心. 版权所有.</p>
+        </div>
+    </footer>
+
+    <!-- 引入 jQuery, Popper.js, Bootstrap JS, Socket.IO -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+    <!-- Socket.IO 客户端库，由服务器提供 -->
+    <script src="/socket.io/socket.io.js"></script>
+
+    <script>
+        // 初始化 Socket.IO 客户端
+        const socket = io();
+
+        // 定义全局留言池
+        let allMessages = [];
+
+        // 接收历史留言，保存到全局留言池并显示为弹幕
+        socket.on('previousMessages', function (messages) {
+            allMessages = messages.slice(); // 复制历史留言
+            messages.forEach(msg => {
+                msg.isDisplayed = false; // 标记历史留言为未展示
+                displayBulletMessage(msg);
+                msg.isDisplayed = true; // 标记为已展示
+            });
+        });
+
+        // 接收新留言，加入留言池并立即显示高亮效果
+        socket.on('newMessage', function (message) {
+            if (message.id) {
+                // 若留言有 id，直接展示新留言并从数组中移除
+                displayBulletMessage(message, true);
+                allMessages = allMessages.filter(msg => msg.id !== message.id);
+            } else {
+                // 若留言没有 id，标记为已展示
+                message.isDisplayed = true;
+                displayBulletMessage(message, true);
+            }
+        });
+
+        // 为发送留言按钮绑定点击事件
+        document.getElementById('sendMessageBtn').addEventListener('click', function () {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            if (message !== '') {
+                console.log("发送留言：", message);
+                socket.emit('sendMessage', message);
+                input.value = '';  // 清空输入框
+            }
+        });
+
+        // 每隔 2 秒随机从留言池中取一条未展示的留言显示（如果当前弹幕数量少于 15 条）
+        setInterval(function () {
+            const container = document.getElementById('bulletContainer');
+            if (container.childElementCount < 15 && allMessages.length > 0) {
+                // 只选择未展示的新留言
+                const undisplayed = allMessages.filter(msg => !msg.isDisplayed);
+                if (undisplayed.length > 0) {
+                    const randomIndex = Math.floor(Math.random() * undisplayed.length);
+                    displayBulletMessage(undisplayed[randomIndex]);
+                    undisplayed[randomIndex].isDisplayed = true; // 标记为已展示
+                }
+            }
+        }, 2000);
+
+        // 显示弹幕的函数，isNew 表示是否为新发表的留言
+        function displayBulletMessage(message, isNew = false) {
+            const container = document.getElementById('bulletContainer');
+            // 如果当前弹幕数量已达15条，则移除最旧的弹幕
+            if (container.childElementCount >= 15) {
+                container.removeChild(container.firstChild);
+            }
+            const bullet = document.createElement('div');
+            bullet.classList.add('bullet-message');
+            bullet.textContent = message.content ? message.content : message;
+            // 随机分配垂直位置，确保不会超出屏幕（假设每条弹幕高度约 30px）
+            const maxTop = window.innerHeight - 30;
+            bullet.style.top = Math.floor(Math.random() * maxTop) + 'px';
+            if (isNew) {
+                // 对新留言添加高亮效果
+                bullet.style.backgroundColor = 'rgba(255, 255, 0, 0.7)';
+                bullet.style.padding = '2px 4px';
+                bullet.style.borderRadius = '4px';
+            }
+            container.appendChild(bullet);
+            // 动画结束后自动移除（8秒），同时重置该留言的 isDisplayed 标记
+            setTimeout(() => {
+                if (container.contains(bullet)) {
+                    container.removeChild(bullet);
+                }
+                message.isDisplayed = false; // 重置标记，使该留言可以被再次显示
+            }, 8000);
+        }
+
+    </script>
+</body>
+</html>

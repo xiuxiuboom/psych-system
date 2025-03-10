@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>管理员后台 - 留言管理 - 心理咨询系统</title>
+    <!-- 使用 Bootswatch Cosmo 主题 -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootswatch/4.5.2/cosmo/bootstrap.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <a class="navbar-brand" href="admin.html">管理员后台</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarContentAdmin"
+                aria-controls="navbarContentAdmin" aria-expanded="false" aria-label="切换导航">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarContentAdmin">
+            <ul class="navbar-nav mr-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="admin.html">用户管理</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="adminArticles.html">文章管理</a>
+                </li>
+                <li class="nav-item active">
+                    <a class="nav-link" href="adminMessages.html">留言管理</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="adminQuotes.html">心理语录管理</a>
+                </li>
+            </ul>
+            <ul class="navbar-nav ml-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="#" id="adminLogoutBtn">退出</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container my-5">
+        <h2 class="text-center">匿名留言管理</h2>
+        <table class="table table-striped" id="messagesTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>留言内容</th>
+                    <th>发布时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- 留言数据将动态生成 -->
+            </tbody>
+        </table>
+    </div>
+
+    <footer class="bg-primary text-white text-center py-3">
+        <div class="container">
+            <p class="mb-0">&copy; 2025 心理咨询中心. 版权所有.</p>
+        </div>
+    </footer>
+
+    <!-- 引入 jQuery, Popper.js, Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+    // 检查管理员登录状态
+    if (!localStorage.getItem('isAdmin')) {
+      window.location.href = 'adminLogin.html';
+    }
+
+    // 管理员退出登录
+    document.getElementById('adminLogoutBtn').addEventListener('click', function(e) {
+      e.preventDefault();
+      localStorage.removeItem('isAdmin');
+      window.location.href = 'adminLogin.html';
+    });
+
+    // 加载所有留言数据
+    function loadMessages() {
+      fetch('/api/messages')
+        .then(response => response.json())
+        .then(data => {
+          const tbody = document.querySelector('#messagesTable tbody');
+          tbody.innerHTML = '';
+          data.forEach(message => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${message.id}</td>
+              <td>${message.content}</td>
+              <td>${new Date(message.created_at).toLocaleString()}</td>
+              <td>
+                <button class="btn btn-sm btn-danger delete-message-btn" data-id="${message.id}">删除</button>
+              </td>
+            `;
+            tbody.appendChild(row);
+          });
+
+          // 为删除按钮绑定事件
+          document.querySelectorAll('.delete-message-btn').forEach(button => {
+            button.addEventListener('click', function() {
+              const id = this.getAttribute('data-id');
+              if (confirm('确定要删除该留言吗？')) {
+                deleteMessage(id);
+              }
+            });
+          });
+        })
+        .catch(error => console.error('加载留言数据出错:', error));
+    }
+
+    // 删除留言
+    function deleteMessage(messageId) {
+      fetch('/api/message?id=' + messageId, {
+        method: 'DELETE'
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          alert('留言删除成功');
+          loadMessages();
+        } else {
+          alert('删除失败: ' + (data.error || '未知错误'));
+        }
+      })
+      .catch(error => {
+        console.error('删除留言失败:', error);
+        alert('删除留言失败');
+      });
+    }
+
+    // 初始加载留言数据
+    loadMessages();
+    </script>
+</body>
+</html>

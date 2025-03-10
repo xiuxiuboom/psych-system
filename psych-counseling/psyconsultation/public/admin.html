@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>管理员后台 - 心理咨询系统</title>
+    <!-- 使用 Bootswatch Cosmo 主题 -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootswatch/4.5.2/cosmo/bootstrap.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!--只有通过管理员登录的用户才能访问 admin.html-->
+    <script>
+        // 检查管理员登录状态
+        if (!localStorage.getItem('isAdmin')) {
+            window.location.href = 'adminLogin.html';
+        }
+    </script>
+
+    <!-- 导航栏：与其他页面保持一致 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <a class="navbar-brand" href="admin.html">管理员后台</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarContentAdmin"
+                aria-controls="navbarContentAdmin" aria-expanded="false" aria-label="切换导航">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarContentAdmin">
+            <ul class="navbar-nav mr-auto">
+                <li class="nav-item active">
+                    <a class="nav-link" href="admin.html">用户管理</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="adminArticles.html">文章管理</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="adminQuotes.html">心理语录管理</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="adminMessages.html">留言墙管理</a>
+                </li>
+            </ul>
+            <ul class="navbar-nav ml-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="#" id="adminLogoutBtn">退出</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+
+    <div class="container my-5">
+        <h2 class="text-center">用户管理</h2>
+        <table class="table table-striped" id="usersTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>用户名</th>
+                    <th>Email</th>
+                    <th>身份</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- 用户数据将动态生成 -->
+            </tbody>
+        </table>
+    </div>
+
+    <footer class="bg-primary text-white text-center py-3">
+        <div class="container">
+            <p class="mb-0">&copy; 2025 心理咨询中心. 版权所有.</p>
+        </div>
+    </footer>
+
+    <!-- 引入 jQuery, Popper.js, Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // 检查管理员登录状态（假设管理员登录后 localStorage 中设置了 isAdmin 为 true）
+        if (!localStorage.getItem('isAdmin')) {
+            window.location.href = 'adminLogin.html';
+        }
+
+        // 获取用户数据并生成表格
+        function loadUsers() {
+            fetch('/api/users')
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.querySelector('#usersTable tbody');
+                    tbody.innerHTML = ''; // 清空表格
+                    data.forEach(user => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                              <td>${user.id}</td>
+                              <td>${user.username}</td>
+                              <td>${user.email}</td>
+                              <td>
+                                <select class="form-control role-select" data-user-id="${user.id}">
+                                  <option value="普通用户" ${user.role === '普通用户' ? 'selected' : ''}>普通用户</option>
+                                  <option value="心理医生" ${user.role === '心理医生' ? 'selected' : ''}>心理医生</option>
+                                  <option value="管理员" ${user.role === '管理员' ? 'selected' : ''}>管理员</option>
+                                </select>
+                              </td>
+                              <td>
+                                <button class="btn btn-sm btn-success update-role-btn" data-user-id="${user.id}">更新</button>
+                              </td>
+                            `;
+                        tbody.appendChild(row);
+                    });
+
+                    // 为所有更新按钮绑定点击事件
+                    document.querySelectorAll('.update-role-btn').forEach(button => {
+                        button.addEventListener('click', function () {
+                            const userId = this.getAttribute('data-user-id');
+                            const selectElem = document.querySelector(`.role-select[data-user-id="${userId}"]`);
+                            const newRole = selectElem.value;
+                            updateUserRole(userId, newRole);
+                        });
+                    });
+                })
+                .catch(error => console.error('加载用户数据出错:', error));
+        }
+
+        // 发送 PUT 请求更新用户角色
+        function updateUserRole(userId, role) {
+            fetch('/api/user', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: userId, role: role })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('用户身份更新成功');
+                        loadUsers();
+                    } else {
+                        alert('更新失败: ' + (data.error || '未知错误'));
+                    }
+                })
+                .catch(error => {
+                    console.error('更新用户身份失败:', error);
+                    alert('更新用户身份失败');
+                });
+        }
+
+        // 管理员退出登录
+        document.getElementById('adminLogoutBtn').addEventListener('click', function (e) {
+            e.preventDefault();
+            localStorage.removeItem('isAdmin');
+            window.location.href = 'adminLogin.html';
+        });
+
+        // 初始加载用户数据
+        loadUsers();
+    </script>
+</body>
+</html>

@@ -80,13 +80,16 @@
 
             const result = await response.json();
             if (response.ok) {
-                // 登录成功，存储登录状态和用户名
+                // 登录成功，存储登录状态、用户名以及角色信息
                 localStorage.setItem('isLoggedIn', true);
                 localStorage.setItem('username', result.user.username);
-                window.location.href = 'index.html';  // 登录后跳转到首页
-            } else {
-                alert('登录失败: ' + (result.error || '未知错误'));
+                localStorage.setItem('role', result.user.role);
+
+                // 所有用户统一跳转到首页
+                window.location.href = 'index.html';
             }
+
+
         });
 
     </script>

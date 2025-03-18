@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>咨询医生 - 心理咨询系统</title>
+    <!-- 使用 Bootswatch Cosmo 主题 -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootswatch/4.5.2/cosmo/bootstrap.min.css">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* 简单的自定义样式，可根据需要调整 */
+        .doctor-card {
+            margin-bottom: 20px;
+        }
+
+            .doctor-card img {
+                width: 100%;
+                height: auto;
+            }
+    </style>
+</head>
+<body>
+    <!-- 导航栏（可以和其他页面保持一致） -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <a class="navbar-brand" href="index.html">心理咨询中心</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarContent"
+                aria-controls="navbarContent" aria-expanded="false" aria-label="切换导航">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarContent">
+            <ul class="navbar-nav mr-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="index.html">首页</a>
+                </li>
+                <li class="nav-item active">
+                    <a class="nav-link" href="doctorList.html">咨询医生</a>
+                </li>
+                <!-- 其他导航项 -->
+            </ul>
+            <!-- 如果需要用户信息区域 -->
+        </div>
+    </nav>
+
+    <div class="container my-5">
+        <h2 class="text-center mb-4">请选择您需要咨询的医生</h2>
+        <div class="row" id="doctorList">
+            <!-- 医生卡片将动态生成 -->
+        </div>
+    </div>
+    
+    <!-- 页脚 -->
+    <footer class="bg-primary text-white text-center py-3">
+        <div class="container">
+            <p class="mb-0">&copy; 2025 心理咨询中心. 版权所有.</p>
+        </div>
+    </footer>
+
+    <!-- 引入 jQuery, Popper.js, Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // 权限检查：确保只有普通用户才能访问 doctorList.html
+        if (localStorage.getItem("role") !== "普通用户") {
+            alert("您没有权限访问此页面！这是普通用户的页面");
+            window.location.href = "index.html";
+        }
+
+        // 页面加载后调用后端接口获取医生信息
+        fetch('/api/doctors')
+            .then(response => response.json())
+            .then(data => {
+                const doctorList = document.getElementById('doctorList');
+                doctorList.innerHTML = '';  // 清空容器
+                data.forEach(doctor => {
+                    // 构建医生卡片 HTML
+                    const cardHTML = `
+              <div class="col-md-4 doctor-card">
+                <div class="card">
+                  <div class="card-body">
+                    <h5 class="card-title">${doctor.username}</h5>
+                    <p class="card-text">
+                      <strong>职称：</strong> ${doctor.title || '暂无'}<br>
+                      <strong>擅长：</strong> ${doctor.expertise || '暂无'}<br>
+                      <strong>从业时间：</strong> ${doctor.working_years || '未知'} 年<br>
+                      <strong>评价数量：</strong> ${doctor.review_count || 0}
+                    </p>
+                    <a href="chat.html?doctorId=${doctor.id}" class="btn btn-primary">立即咨询</a>
+                  </div>
+                </div>
+              </div>
+            `;
+                    doctorList.insertAdjacentHTML('beforeend', cardHTML);
+                });
+            })
+            .catch(error => console.error('加载医生信息出错:', error));
+    </script>
+</body>
+</html>

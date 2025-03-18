@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>医生管理界面 - 心理咨询中心</title>
+    <!-- 引入 Bootswatch Cosmo 主题（与其他页面风格一致） -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootswatch/4.5.2/cosmo/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+
+        .container {
+            margin-top: 80px;
+            margin-bottom: 80px;
+        }
+
+        .card {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
+        <a class="navbar-brand" href="doctorDashboard.html">医生管理中心</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarContent"
+                aria-controls="navbarContent" aria-expanded="false" aria-label="切换导航">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarContent">
+            <ul class="navbar-nav mr-auto">
+                <li class="nav-item active">
+                    <a class="nav-link" href="doctorDashboard.html">医生工作台</a>
+                </li>
+                <li class="nav-item active">
+                    <a class="nav-link" href="doctorDashboard.html">预约处理</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="chat.html?doctorId=YOUR_DOCTOR_ID">实时对话</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="consultRecords.html">咨询记录</a>
+                </li>
+            </ul>
+            <span class="navbar-text">
+                欢迎，心理医生
+            </span>
+        </div>
+    </nav>
+
+    <!-- 页面主体内容 -->
+    <div class="container">
+        <!-- 预约处理区 -->
+        <div class="row">
+            <div class="col-md-12">
+                <h2>预约处理</h2>
+                <!-- 此处使用卡片形式展示待处理预约 -->
+                <div id="appointmentCards">
+                    <!-- 动态加载预约请求卡片 -->
+                    <!-- 示例卡片 -->
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">预约请求 - 用户张三</h5>
+                            <p class="card-text">预约时段：上午 8:30 - 9:30</p>
+                            <button class="btn btn-success">接受咨询</button>
+                            <button class="btn btn-danger">拒绝预约</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- 实时对话入口 -->
+        <div class="row">
+            <div class="col-md-12">
+                <h2>实时对话</h2>
+                <p>点击下面按钮进入与患者的实时聊天界面：</p>
+                <a href="chat.html?doctorId=YOUR_DOCTOR_ID" class="btn btn-primary">进入实时聊天</a>
+            </div>
+        </div>
+        <!-- 咨询记录查看 -->
+        <div class="row">
+            <div class="col-md-12">
+                <h2>咨询记录</h2>
+                <!-- 这里可以展示历史咨询记录 -->
+                <div id="consultationRecords">
+                    <!-- 示例：使用表格或卡片展示记录 -->
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>患者姓名</th>
+                                <th>咨询时长</th>
+                                <th>日期</th>
+                                <th>评价</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>李四</td>
+                                <td>45分钟</td>
+                                <td>2025-03-10</td>
+                                <td>好评</td>
+                            </tr>
+                            <!-- 其他记录 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部页脚 -->
+    <footer class="bg-primary text-white text-center py-3 fixed-bottom">
+        <div class="container">
+            <p class="mb-0">&copy; 2025 心理咨询中心. 版权所有.</p>
+        </div>
+    </footer>
+
+    <!-- 引入 jQuery, Popper.js, Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+
+    <!-- 简单的前端身份验证（仅作示例，实际请在后端校验） -->
+    <script>
+    // 假设登录后在 localStorage 保存了用户身份，例如：localStorage.setItem("role", "心理医生")
+    // 这里检查用户身份，若不是心理医生则拒绝访问
+    if (localStorage.getItem("role") !== "心理医生") {
+      alert("您没有权限访问医生管理界面！");
+      window.location.href = "index.html";  // 重定向到首页或其他页面
+    }
+    </script>
+</body>
+</html>

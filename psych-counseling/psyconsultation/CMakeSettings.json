@@ -1,0 +1,19 @@
+{
+  "configurations": [
+    {
+      "name": "x64-Debug",
+      "generator": "Ninja",
+      "configurationType": "Debug",
+      "buildRoot": "${projectDir}\\out\\build\\x64-Debug",
+      "installRoot": "${projectDir}\\out\\install\\x64-Debug",
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "",
+      "ctestCommandArgs": "",
+      "inheritEnvironments": [ "msvc_x64" ],
+      "environment": {
+        "HTTP_PROXY": "127.0.0.1:10809",
+        "HTTPS_PROXY": "127.0.0.1:10809"
+      }
+    }
+  ]
+}

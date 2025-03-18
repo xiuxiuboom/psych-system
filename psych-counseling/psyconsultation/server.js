@@ -426,8 +426,55 @@ app.get('/api/announcement', (req, res) => {
     });
 });
 
+
+// 获取所有医生信息（从 users 表中筛选角色为“心理医生”的记录）
+app.get('/api/doctors', (req, res) => {
+    const sql = "SELECT id, username, title, expertise, working_years, review_count FROM users WHERE role = '心理医生'";
+    db.query(sql, (err, results) => {
+        if (err) {
+            console.error('查询医生列表错误:', err);
+            return res.status(500).json({ error: '无法获取医生列表' });
+        }
+        res.json(results);
+    });
+});
+
 // 启动服务器
 const PORT = 3000;
 server.listen(PORT, () => {
     console.log(`服务器已启动，访问网址：http://localhost:${PORT}`);
 });
+
+
+const WebSocket = require('ws');
+
+// 连接 C++ 聊天服务（确保端口和地址正确）
+//确保端口号 9000 与 C++ 聊天服务监听的端口一致，并且网络配置（如防火墙）允许通过该端口通信。
+const cppWs = new WebSocket('ws://127.0.0.1:9000');
+// 建立 Node.js 自己的 WebSocket 服务器供前端连接
+const wss = new WebSocket.Server({ port: 8080 });
+
+cppWs.on('open', () => {
+    console.log('已连接 C++ 聊天服务');
+});
+
+// 当从 C++ 服务收到消息，转发给所有连接 Node.js 的客户端
+cppWs.on('message', (data) => {
+    // 将 data 转换为字符串
+    const textMessage = data.toString();
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(textMessage);
+        }
+    });
+});
+
+
+// 当前端发来消息，通过 Node.js 中转发送到 C++ 服务
+wss.on('connection', (client) => {
+    client.on('message', (message) => {
+        cppWs.send(message);
+    });
+});
+
+console.log("Node.js WebSocket 中转服务器已启动，监听端口 8080");

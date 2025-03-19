@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>预约记录 - 心理咨询系统</title>
+    <!-- Bootswatch Cosmo 主题 -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootswatch/4.5.2/cosmo/bootstrap.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <a class="navbar-brand" href="index.html">心理咨询中心</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarContent"
+                aria-controls="navbarContent" aria-expanded="false" aria-label="切换导航">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarContent">
+            <ul class="navbar-nav mr-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="index.html">首页</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="articles.html">文章</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="messageWall.html">留言墙</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="userAppointments.html">预约记录</a>
+                </li>
+            </ul>
+            <!-- 用户信息区域 -->
+            <ul class="navbar-nav ml-auto">
+                <li class="nav-item" id="userInfo">
+                    <!-- 显示欢迎信息 -->
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" id="logoutBtn">退出登录</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- 主体内容 -->
+    <main class="container mt-5">
+        <h2 class="text-center mb-4">我的预约记录</h2>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>医生</th>
+                    <th>日期</th>
+                    <th>时段</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="appointmentTableBody">
+                <!-- 预约记录动态生成 -->
+            </tbody>
+        </table>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-primary text-white text-center py-2" style="position: relative; width: 100%;">
+        <div class="container">
+            <p class="mb-0">&copy; 2025 心理咨询中心. 版权所有.</p>
+        </div>
+    </footer>
+
+    <!-- 引入 jQuery, Popper.js, Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+    // 检查登录状态并显示用户信息
+    if (!localStorage.getItem('isLoggedIn')) {
+      window.location.href = 'login.html';
+    } else {
+      const username = localStorage.getItem('username');
+      const userInfoElem = document.getElementById('userInfo');
+      if (userInfoElem) {
+        userInfoElem.innerHTML = `<span class="navbar-text">欢迎, ${username}</span>`;
+      }
+    }
+
+    // 绑定退出登录事件
+    document.getElementById('logoutBtn').addEventListener('click', function (e) {
+      e.preventDefault();
+      localStorage.removeItem('isLoggedIn');
+      localStorage.removeItem('username');
+      localStorage.removeItem('userId');
+      localStorage.removeItem('role');
+      window.location.href = 'login.html';
+    });
+
+    // 获取当前登录用户的ID（假设登录时已将 userId 存入 localStorage）
+    const userId = localStorage.getItem('userId');
+    if (!userId) {
+      alert("无法获取用户ID，请重新登录！");
+      window.location.href = 'login.html';
+    }
+
+    // 获取预约记录并显示在表格中
+    fetch(`/api/appointments?userId=${userId}`)
+      .then(res => res.json())
+      .then(data => {
+        const tableBody = document.getElementById('appointmentTableBody');
+        tableBody.innerHTML = "";
+        if (data.length === 0) {
+          tableBody.innerHTML = '<tr><td colspan="5" class="text-center">暂无预约记录</td></tr>';
+          return;
+        }
+        data.forEach(appt => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${appt.doctorName || '未知医生'}</td>
+            <td>${appt.date}</td>
+            <td>${appt.time_slot}</td>
+            <td>${appt.status}</td>
+            <td><button class="btn btn-danger btn-sm cancelBtn" data-id="${appt.id}">取消</button></td>
+          `;
+          tableBody.appendChild(row);
+        });
+
+        // 为所有取消按钮绑定事件
+        document.querySelectorAll('.cancelBtn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const appointmentId = btn.getAttribute('data-id');
+            if (confirm("确定要取消该预约吗？")) {
+              fetch(`/api/appointments/${appointmentId}`, {
+                method: 'DELETE'
+              })
+              .then(res => res.json())
+              .then(result => {
+                if (result.success) {
+                  alert('预约已取消');
+                  // 刷新页面以更新记录
+                  window.location.reload();
+                } else {
+                  alert('取消失败：' + (result.error || '未知错误'));
+                }
+              })
+              .catch(err => {
+                console.error(err);
+                alert('取消预约时出错');
+              });
+            }
+          });
+        });
+      })
+      .catch(error => {
+        console.error('获取预约记录出错:', error);
+      });
+    </script>
+</body>
+</html>

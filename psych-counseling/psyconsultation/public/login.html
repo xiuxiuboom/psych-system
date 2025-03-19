@@ -55,7 +55,6 @@
                 <p>没有账号？ <a href="register.html">注册</a></p>
                 <p>管理员入口：<a href="adminLogin.html">点击这里</a></p>
             </div>
-
         </div>
     </div>
 
@@ -80,18 +79,18 @@
 
             const result = await response.json();
             if (response.ok) {
-                // 登录成功，存储登录状态、用户名以及角色信息
+                // 登录成功，存储登录状态、用户名、角色以及用户ID
                 localStorage.setItem('isLoggedIn', true);
                 localStorage.setItem('username', result.user.username);
                 localStorage.setItem('role', result.user.role);
+                localStorage.setItem('userId', result.user.id);  // 保存用户ID
 
                 // 所有用户统一跳转到首页
                 window.location.href = 'index.html';
+            } else {
+                alert('登录失败: ' + (result.error || '未知错误'));
             }
-
-
         });
-
     </script>
 </body>
 </html>

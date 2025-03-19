@@ -35,6 +35,9 @@
                 <li class="nav-item active">
                     <a class="nav-link" href="doctorList.html">咨询医生</a>
                 </li>
+                <li class="nav-item active">
+                    <a class="nav-link" href="userAppointments.html">预约记录</a>
+                </li>
                 <!-- 其他导航项 -->
             </ul>
             <!-- 如果需要用户信息区域 -->
@@ -49,7 +52,7 @@
     </div>
     
     <!-- 页脚 -->
-    <footer class="bg-primary text-white text-center py-3">
+    <footer class="bg-primary text-white text-center py-3" style="position: fixed; bottom: 0; width: 100%;">
         <div class="container">
             <p class="mb-0">&copy; 2025 心理咨询中心. 版权所有.</p>
         </div>
@@ -87,6 +90,7 @@
                       <strong>评价数量：</strong> ${doctor.review_count || 0}
                     </p>
                     <a href="chat.html?doctorId=${doctor.id}" class="btn btn-primary">立即咨询</a>
+                    <a href="appointment.html?doctorId=${doctor.id}" class="btn btn-secondary">预约</a>
                   </div>
                 </div>
               </div>

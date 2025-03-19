@@ -1,28 +1,30 @@
 /* 全局样式 */
 @charset "UTF-8";
 
+/* 全局样式 */
 body {
     font-family: 'Arial', sans-serif;
-    background-color: #f4f7fc; /* 背景颜色 */
+    background-color: #f4f7fc;
     margin: 0;
     padding: 0;
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    flex-direction: column;
-    min-height: 100vh;
 }
 
-.container {
-    width: 100%;
+/* 主要内容容器，应用 flex 布局 */
+.main-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    min-height: calc(100vh - 120px); /* 留出导航栏和固定页脚空间 */
+    margin: 20px auto;
     max-width: 800px;
-    margin: 20px;
     background-color: #fff; /* 白色背景 */
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* 阴影效果 */
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
     padding: 30px;
     border-radius: 10px;
 }
 
+/* 其他已有样式保持不变 */
 .welcome-container h2 {
     text-align: center;
     color: #333;
@@ -164,3 +166,19 @@ body {
         position: relative;
         z-index: 2;
     }
+
+/* 确保主体内容填充整个屏幕 */
+main {
+    min-height: calc(100vh - 120px); /* 120px 预留导航栏和页脚空间 */
+    padding-bottom: 60px; /* 预留给页脚的空间，防止其覆盖内容 */
+}
+
+/* 让页脚自然位于底部 */
+footer {
+    background-color: #007BFF;
+    color: white;
+    text-align: center;
+    padding: 10px 0;
+    position: relative;
+    width: 100%;
+}

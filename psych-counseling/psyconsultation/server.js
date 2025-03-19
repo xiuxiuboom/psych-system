@@ -429,13 +429,196 @@ app.get('/api/announcement', (req, res) => {
 
 // 获取所有医生信息（从 users 表中筛选角色为“心理医生”的记录）
 app.get('/api/doctors', (req, res) => {
-    const sql = "SELECT id, username, title, expertise, working_years, review_count FROM users WHERE role = '心理医生'";
-    db.query(sql, (err, results) => {
-        if (err) {
-            console.error('查询医生列表错误:', err);
-            return res.status(500).json({ error: '无法获取医生列表' });
+    if (req.query.id) {
+        const sql = "SELECT id, username, title, expertise, working_years, review_count FROM users WHERE role = '心理医生' AND id = ?";
+        db.query(sql, [req.query.id], (err, results) => {
+            if (err) {
+                console.error('查询医生详情错误:', err);
+                return res.status(500).json({ error: '无法获取医生信息' });
+            }
+            if (results.length === 0) {
+                return res.status(404).json({ error: '医生未找到' });
+            }
+            res.json(results[0]);
+        });
+    } else {
+        const sql = "SELECT id, username, title, expertise, working_years, review_count FROM users WHERE role = '心理医生'";
+        db.query(sql, (err, results) => {
+            if (err) {
+                console.error('查询医生列表错误:', err);
+                return res.status(500).json({ error: '无法获取医生列表' });
+            }
+            res.json(results);
+        });
+    }
+});
+
+
+app.post('/api/appointments', (req, res) => {
+    const { userId, doctorId, date, timeSlot, profile } = req.body;
+
+    // 验证必填字段
+    if (!userId || !doctorId || !date || !timeSlot || !profile) {
+        return res.status(400).json({ error: '缺少必填参数' });
+    }
+
+    // 计算 end_time：假设 timeSlot 格式为 "HH:MM-HH:MM"
+    let endTime = null;
+    const parts = timeSlot.split('-');
+    if (parts.length === 2) {
+        endTime = parts[1].trim();
+        // 如果时间格式只有小时和分钟，则补上秒数 ":00"
+        if (endTime.split(':').length === 2) {
+            endTime += ":00";
         }
-        res.json(results);
+    } else {
+        return res.status(400).json({ error: '预约时段格式错误' });
+    }
+
+    // 1. 检查该医生在指定日期和时段的预约数量是否已满（>= 3）
+    const checkDoctorSQL = 'SELECT COUNT(*) AS count FROM appointments WHERE doctor_id = ? AND date = ? AND time_slot = ?';
+    db.query(checkDoctorSQL, [doctorId, date, timeSlot], (err, doctorResult) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).json({ error: '查询医生预约失败' });
+        }
+        if (doctorResult[0].count >= 3) {
+            return res.status(400).json({ error: '该时段医生预约已满' });
+        }
+
+        // 2. 检查该用户在同一时段的预约数量是否达到上限（示例：同一时段最多 2 次预约）
+        const checkUserSQL = 'SELECT COUNT(*) AS count FROM appointments WHERE user_id = ? AND date = ? AND time_slot = ?';
+        db.query(checkUserSQL, [userId, date, timeSlot], (err, userResult) => {
+            if (err) {
+                console.error(err);
+                return res.status(500).json({ error: '查询用户预约失败' });
+            }
+            if (userResult[0].count >= 2) {
+                return res.status(400).json({ error: '您在该时段预约次数已达上限' });
+            }
+
+            // 3. 检查用户24小时内预约总次数（示例：最多3次）
+            const check24hSQL = 'SELECT COUNT(*) AS count FROM appointments WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)';
+            db.query(check24hSQL, [userId], (err, countResult) => {
+                if (err) {
+                    console.error(err);
+                    return res.status(500).json({ error: '查询24小时预约失败' });
+                }
+                if (countResult[0].count >= 3) {
+                    return res.status(400).json({ error: '您在24小时内预约次数已达上限' });
+                }
+
+                // 4. 所有校验通过，插入预约记录（包含 end_time 字段）
+                const insertSQL = 'INSERT INTO appointments (user_id, doctor_id, date, time_slot, end_time) VALUES (?,?,?,?,?)';
+                db.query(insertSQL, [userId, doctorId, date, timeSlot, endTime], (err, result) => {
+                    if (err) {
+                        console.error(err);
+                        return res.status(500).json({ error: '预约插入失败' });
+                    }
+
+                    // 5. 保存或更新用户心理档案（使用 REPLACE INTO）
+                    const profileSQL = `REPLACE INTO user_profiles 
+            (user_id, name, gender, birthday, phone, email, consult_history, medical_history)
+            VALUES (?,?,?,?,?,?,?,?)`;
+                    db.query(profileSQL, [
+                        userId,
+                        profile.name,
+                        profile.gender,
+                        profile.birthday,
+                        profile.phone,
+                        profile.email,
+                        profile.consultHistory,
+                        profile.medicalHistory
+                    ], (err, result2) => {
+                        if (err) {
+                            console.error(err);
+                            return res.status(500).json({ error: '心理档案保存失败' });
+                        }
+                        return res.json({ success: true });
+                    });
+                });
+            });
+        });
+    });
+});
+
+
+// GET /api/doctorAppointments?doctorId=xxx&date=yyyy-mm-dd
+app.get('/api/doctorAppointments', (req, res) => {
+  const { doctorId, date } = req.query;
+  if (!doctorId || !date) {
+    return res.status(400).json({ error: '缺少 doctorId 或 date 参数' });
+  }
+  const sql = 'SELECT time_slot FROM appointments WHERE doctor_id = ? AND date = ?';
+  db.query(sql, [doctorId, date], (err, results) => {
+    if (err) {
+      console.error('查询预约记录失败:', err);
+      return res.status(500).json({ error: '查询预约记录失败' });
+    }
+    res.json(results);
+  });
+});
+
+// 获取当前用户的预约记录，并更新已过期的记录状态（精确到小时和分钟）
+app.get('/api/appointments', (req, res) => {
+    const userId = req.query.userId;
+    if (!userId) {
+        return res.status(400).json({ error: '缺少 userId 参数' });
+    }
+
+    // 更新已过期的预约状态：如果当前时间大于预约日期和结束时间组合，且状态为“待处理”，则更新为“已过期”
+    const updateSql = `
+    UPDATE appointments 
+    SET status = "已过期" 
+    WHERE CONCAT(date, ' ', end_time) < NOW() 
+      AND status = "待处理" 
+      AND user_id = ?
+  `;
+    db.query(updateSql, [userId], (updateErr, updateResult) => {
+        if (updateErr) {
+            console.error('更新预约状态失败:', updateErr);
+            // 这里可以选择继续查询预约记录，或直接返回错误
+            // 为了不影响查询，我们先记录错误，然后继续执行查询
+        }
+
+        // 查询当前用户的预约记录，并关联医生姓名
+        const sql = `
+      SELECT a.*, u.username AS doctorName 
+      FROM appointments a
+      LEFT JOIN users u ON a.doctor_id = u.id
+      WHERE a.user_id = ?
+      ORDER BY a.date DESC, end_time DESC
+    `;
+        db.query(sql, [userId], (err, results) => {
+            if (err) {
+                console.error('查询预约记录失败:', err);
+                return res.status(500).json({ error: '查询预约记录失败' });
+            }
+            // 返回结果应该为数组
+            res.json(results);
+        });
+    });
+});
+
+// 取消预约接口：删除指定预约记录
+app.delete('/api/appointments/:id', (req, res) => {
+    const appointmentId = req.params.id;
+    if (!appointmentId) {
+        return res.status(400).json({ error: '缺少预约ID' });
+    }
+
+    // 你可以在此处增加权限检查，例如判断当前用户是否有权取消该预约
+
+    const sql = 'DELETE FROM appointments WHERE id = ?';
+    db.query(sql, [appointmentId], (err, result) => {
+        if (err) {
+            console.error('删除预约失败:', err);
+            return res.status(500).json({ error: '删除预约失败' });
+        }
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: '未找到预约记录' });
+        }
+        res.json({ success: true });
     });
 });
 

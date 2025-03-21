@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>医生管理界面 - 心理咨询中心</title>
-    <!-- 引入 Bootswatch Cosmo 主题（与其他页面风格一致） -->
+    <!-- 引入 Bootswatch Cosmo 主题 -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootswatch/4.5.2/cosmo/bootstrap.min.css">
     <style>
         body {
@@ -13,10 +13,15 @@
         .container {
             margin-top: 80px;
             margin-bottom: 80px;
+            max-width: 1000px;
         }
 
         .card {
             margin-bottom: 20px;
+        }
+
+        .table-responsive {
+            margin-top: 20px;
         }
     </style>
 </head>
@@ -30,87 +35,43 @@
         </button>
         <div class="collapse navbar-collapse" id="navbarContent">
             <ul class="navbar-nav mr-auto">
+                <!-- “医生工作台”不跳转，当前页面为医生工作台 -->
                 <li class="nav-item active">
-                    <a class="nav-link" href="doctorDashboard.html">医生工作台</a>
+                    <span class="nav-link">医生工作台</span>
                 </li>
-                <li class="nav-item active">
-                    <a class="nav-link" href="doctorDashboard.html">预约处理</a>
-                </li>
+                <!-- “咨询服务记录”有链接 -->
                 <li class="nav-item">
-                    <a class="nav-link" href="chat.html?doctorId=YOUR_DOCTOR_ID">实时对话</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="consultRecords.html">咨询记录</a>
+                    <a class="nav-link" href="consultRecords.html">咨询服务记录</a>
                 </li>
             </ul>
             <span class="navbar-text">
-                欢迎，心理医生
+                欢迎, <span id="doctorNameDisplay"></span>
             </span>
         </div>
     </nav>
 
-    <!-- 页面主体内容 -->
     <div class="container">
-        <!-- 预约处理区 -->
-        <div class="row">
-            <div class="col-md-12">
-                <h2>预约处理</h2>
-                <!-- 此处使用卡片形式展示待处理预约 -->
-                <div id="appointmentCards">
-                    <!-- 动态加载预约请求卡片 -->
-                    <!-- 示例卡片 -->
-                    <div class="card">
-                        <div class="card-body">
-                            <h5 class="card-title">预约请求 - 用户张三</h5>
-                            <p class="card-text">预约时段：上午 8:30 - 9:30</p>
-                            <button class="btn btn-success">接受咨询</button>
-                            <button class="btn btn-danger">拒绝预约</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- 实时对话入口 -->
-        <div class="row">
-            <div class="col-md-12">
-                <h2>实时对话</h2>
-                <p>点击下面按钮进入与患者的实时聊天界面：</p>
-                <a href="chat.html?doctorId=YOUR_DOCTOR_ID" class="btn btn-primary">进入实时聊天</a>
-            </div>
-        </div>
-        <!-- 咨询记录查看 -->
-        <div class="row">
-            <div class="col-md-12">
-                <h2>咨询记录</h2>
-                <!-- 这里可以展示历史咨询记录 -->
-                <div id="consultationRecords">
-                    <!-- 示例：使用表格或卡片展示记录 -->
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>患者姓名</th>
-                                <th>咨询时长</th>
-                                <th>日期</th>
-                                <th>评价</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>李四</td>
-                                <td>45分钟</td>
-                                <td>2025-03-10</td>
-                                <td>好评</td>
-                            </tr>
-                            <!-- 其他记录 -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+        <h2 class="text-center mb-4">待处理预约记录</h2>
+        <!-- 预约记录显示区域 -->
+        <div class="table-responsive">
+            <table class="table table-bordered">
+                <thead class="thead-light">
+                    <tr>
+                        <th>预约者</th>
+                        <th>预约日期</th>
+                        <th>时段</th>
+                        <th>心理档案</th>
+                    </tr>
+                </thead>
+                <tbody id="appointmentTableBody">
+                    <!-- 预约记录动态生成 -->
+                </tbody>
+            </table>
         </div>
     </div>
 
-    <!-- 底部页脚 -->
-    <footer class="bg-primary text-white text-center py-3 fixed-bottom">
+    <!-- 固定页脚（可选择固定或相对） -->
+    <footer class="bg-primary text-white text-center py-2" style="position: relative; width: 100%;">
         <div class="container">
             <p class="mb-0">&copy; 2025 心理咨询中心. 版权所有.</p>
         </div>
@@ -121,14 +82,66 @@
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
 
-    <!-- 简单的前端身份验证（仅作示例，实际请在后端校验） -->
     <script>
-    // 假设登录后在 localStorage 保存了用户身份，例如：localStorage.setItem("role", "心理医生")
-    // 这里检查用户身份，若不是心理医生则拒绝访问
-    if (localStorage.getItem("role") !== "心理医生") {
-      alert("您没有权限访问医生管理界面！");
-      window.location.href = "index.html";  // 重定向到首页或其他页面
-    }
+        // 确保医生已登录，并且角色为“心理医生”
+        if (localStorage.getItem("role") !== "心理医生") {
+            alert("您没有权限访问医生管理界面！");
+            window.location.href = "index.html";
+        }
+
+        // 假设登录时保存的 userId 为医生的ID
+        const doctorId = localStorage.getItem("userId");
+        if (!doctorId) {
+            alert("无法获取医生ID，请重新登录！");
+            window.location.href = "login.html";
+        }
+
+        // 显示医生姓名在导航栏中
+        document.getElementById("doctorNameDisplay").textContent = localStorage.getItem("username");
+
+        // 获取待处理预约记录
+        async function loadAppointments() {
+            try {
+                const response = await fetch(`/api/doctorAppointments?doctorId=${doctorId}`);
+                if (response.ok) {
+                    const appointments = await response.json();
+                    const tableBody = document.getElementById("appointmentTableBody");
+                    tableBody.innerHTML = "";
+                    if (appointments.length === 0) {
+                        tableBody.innerHTML = `<tr><td colspan="4" class="text-center">暂无待处理预约记录</td></tr>`;
+                        return;
+                    }
+                    // 遍历预约记录（已按创建时间排序，先来先服务）
+                    appointments.forEach(appt => {
+                        const row = document.createElement("tr");
+                        row.innerHTML = `
+                  <td>${appt.userName || '未知'}</td>
+                  <td>${appt.date}</td>
+                  <td>${appt.time_slot}</td>
+                  <td>
+                    姓名：${appt.profileName || '无'}<br>
+                    性别：${appt.gender || '无'}<br>
+                    出生日期：${appt.birthday || '无'}<br>
+                    电话：${appt.phone || '无'}<br>
+                    邮箱：${appt.email || '无'}<br>
+                    咨询历史：${appt.consult_history || '无'}<br>
+                    健康状况：${appt.medical_history || '无'}
+                  </td>
+                `;
+                        tableBody.appendChild(row);
+                    });
+                } else {
+                    alert("获取预约记录失败：" + (await response.text()));
+                }
+            } catch (error) {
+                console.error("加载预约记录出错:", error);
+            }
+        }
+
+        // 页面加载时获取预约记录
+        document.addEventListener("DOMContentLoaded", () => {
+            loadAppointments();
+        });
     </script>
 </body>
 </html>

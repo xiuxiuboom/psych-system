@@ -61,6 +61,48 @@
             <!-- 通过 doctorId 调用后端获取医生信息并显示 -->
         </div>
 
+        <!-- 预留一个区域显示已有档案信息提示 -->
+        <div id="profileTip"></div>
+
+        <!-- 填写心理档案部分 -->
+        <div id="profileSection">
+            <h4 class="section-title">填写心理档案</h4>
+            <form id="profileForm">
+                <div class="form-group">
+                    <label for="name">姓名</label>
+                    <input type="text" id="name" class="form-control" placeholder="请输入您的姓名" required>
+                </div>
+                <div class="form-group">
+                    <label for="gender">性别</label>
+                    <select id="gender" class="form-control">
+                        <option value="男">男</option>
+                        <option value="女">女</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="birthday">出生日期</label>
+                    <input type="date" id="birthday" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label for="phone">联系方式（电话）</label>
+                    <input type="text" id="phone" class="form-control" placeholder="例如: 138xxxx1234">
+                </div>
+                <div class="form-group">
+                    <label for="email">电子邮件</label>
+                    <input type="email" id="email" class="form-control" placeholder="例如: example@mail.com">
+                </div>
+                <div class="form-group">
+                    <label for="consultHistory">咨询历史</label>
+                    <textarea id="consultHistory" class="form-control" rows="3" placeholder="例如: 曾在XX医院咨询过..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="medicalHistory">医疗和心理健康状况</label>
+                    <textarea id="medicalHistory" class="form-control" rows="3" placeholder="例如: 目前在服用XXX药物..."></textarea>
+                </div>
+            </form>
+        </div>
+
+        <!-- 预约时段选择部分 -->
         <div class="card p-3">
             <div class="card-body">
                 <h4 class="section-title">请选择预约日期与时段</h4>
@@ -72,7 +114,6 @@
                     <label for="timeSlotSelect">预约时段</label>
                     <select id="timeSlotSelect" class="form-control" required>
                         <option value="">请选择</option>
-                        <!-- 固定6个时段示例 -->
                         <option value="08:30-09:30">08:30-09:30</option>
                         <option value="09:30-10:30">09:30-10:30</option>
                         <option value="10:30-11:30">10:30-11:30</option>
@@ -81,42 +122,6 @@
                         <option value="16:30-17:30">16:30-17:30</option>
                     </select>
                 </div>
-
-                <h4 class="section-title">填写心理档案</h4>
-                <form id="profileForm">
-                    <div class="form-group">
-                        <label for="name">姓名</label>
-                        <input type="text" id="name" class="form-control" placeholder="请输入您的姓名" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="gender">性别</label>
-                        <select id="gender" class="form-control">
-                            <option value="男">男</option>
-                            <option value="女">女</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="birthday">出生日期</label>
-                        <input type="date" id="birthday" class="form-control">
-                    </div>
-                    <div class="form-group">
-                        <label for="phone">联系方式（电话）</label>
-                        <input type="text" id="phone" class="form-control" placeholder="例如: 138xxxx1234">
-                    </div>
-                    <div class="form-group">
-                        <label for="email">电子邮件</label>
-                        <input type="email" id="email" class="form-control" placeholder="例如: example@mail.com">
-                    </div>
-                    <div class="form-group">
-                        <label for="consultHistory">咨询历史</label>
-                        <textarea id="consultHistory" class="form-control" rows="3" placeholder="例如: 曾在XX医院咨询过..."></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="medicalHistory">医疗和心理健康状况</label>
-                        <textarea id="medicalHistory" class="form-control" rows="3" placeholder="例如: 目前在服用XXX药物..."></textarea>
-                    </div>
-                </form>
-
                 <button id="submitAppointmentBtn" class="btn btn-primary btn-block">提交预约</button>
             </div>
         </div>
@@ -137,7 +142,10 @@
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        // 在全局范围获取 doctorId，使之在所有代码块中有效
+        // 声明全局变量，用于存储已有的心理档案数据
+        let existingProfile = null;
+
+        // 全局获取 doctorId
         const params = new URLSearchParams(window.location.search);
         const doctorId = params.get('doctorId');
         console.log("doctorId:", doctorId);
@@ -146,7 +154,40 @@
             window.location.href = "doctorList.html";
         }
 
-        // 填充时段下拉框以及监听日期变化，更新时段可选状态
+        // 检查当前登录用户是否已经填写心理档案
+        document.addEventListener('DOMContentLoaded', async () => {
+            const userId = localStorage.getItem("userId");
+            if (!userId) {
+                alert("未登录或无法获取用户ID！");
+                window.location.href = "login.html";
+                return;
+            }
+            try {
+                const profileRes = await fetch(`/api/userProfile?userId=${userId}`);
+                if (profileRes.ok) {
+                    const profile = await profileRes.json();
+                    if (profile && Object.keys(profile).length > 0) {
+                        existingProfile = profile;
+                        // 如果已有档案，隐藏档案填写区域，显示提示信息
+                        document.getElementById("profileSection").style.display = "none";
+                        document.getElementById("profileTip").innerHTML = `
+                                <div class="alert alert-info">
+                                    您已填写过心理档案，使用已有信息进行预约：<br>
+                                    姓名：${profile.name} | 性别：${profile.gender} | 出生日期：${profile.birthday}
+                                </div>
+                            `;
+                    } else {
+                        document.getElementById("profileSection").style.display = "block";
+                    }
+                } else {
+                    console.error("查询用户档案失败");
+                }
+            } catch (error) {
+                console.error("查询用户档案失败", error);
+            }
+        });
+
+        // 填充预约时段下拉框，并监听日期变化更新选项状态
         document.addEventListener('DOMContentLoaded', async () => {
             const timeSlots = [
                 '08:30-09:30',
@@ -169,8 +210,7 @@
             appointmentDateInput.addEventListener('change', async function () {
                 const selectedDate = this.value;
                 try {
-                    // 调用后端接口获取该医生在选定日期的预约记录
-                    const response = await fetch(`/api/doctorAppointments?doctorId=${doctorId}&date=${selectedDate}`);
+                    const response = await fetch(`/api/doctorAppointmentsByDate?doctorId=${doctorId}&date=${selectedDate}`);
                     if (response.ok) {
                         const appointments = await response.json();
                         const slotCounts = {};
@@ -198,16 +238,16 @@
             });
         });
 
-        // 获取并显示医生信息
+        // 加载并显示医生信息
         document.addEventListener('DOMContentLoaded', async () => {
             try {
                 const doctorRes = await fetch(`/api/doctors?id=${doctorId}`);
                 if (doctorRes.ok) {
                     const doctor = await doctorRes.json();
                     document.getElementById("doctorInfo").innerHTML = `
-                        <h5>正在为 <strong>${doctor.username}</strong> 进行预约</h5>
-                        <p>职称: ${doctor.title || '暂无'} | 擅长: ${doctor.expertise || '暂无'}</p>
-                    `;
+                            <h5>正在预约 <strong>${doctor.username}</strong> 医生</h5>
+                            <p>职称: ${doctor.title || '暂无'} | 擅长: ${doctor.expertise || '暂无'}</p>
+                        `;
                 } else {
                     document.getElementById("doctorInfo").textContent = "无法获取医生信息";
                 }
@@ -222,15 +262,31 @@
             document.getElementById("submitAppointmentBtn").addEventListener("click", async () => {
                 const appointmentDate = document.getElementById("appointmentDate").value;
                 const timeSlot = document.getElementById("timeSlotSelect").value;
-                const name = document.getElementById("name").value;
-                const gender = document.getElementById("gender").value;
-                const birthday = document.getElementById("birthday").value;
-                const phone = document.getElementById("phone").value;
-                const email = document.getElementById("email").value;
-                const consultHistory = document.getElementById("consultHistory").value;
-                const medicalHistory = document.getElementById("medicalHistory").value;
 
-                if (!appointmentDate || !timeSlot || !name) {
+                // 如果填写区域显示，则取输入框的值；如果隐藏，则从 existingProfile 获取
+                let name = document.getElementById("name").value;
+                let gender = document.getElementById("gender").value;
+                let birthday = document.getElementById("birthday").value;
+                let phone = document.getElementById("phone").value;
+                let email = document.getElementById("email").value;
+                let consultHistory = document.getElementById("consultHistory").value;
+                let medicalHistory = document.getElementById("medicalHistory").value;
+
+                // 判断 profileSection 是否隐藏
+                const profileSectionDisplay = document.getElementById("profileSection").style.display;
+                if (profileSectionDisplay === "none" && existingProfile) {
+                    // 如果隐藏，则直接使用 existingProfile 中的数据
+                    name = existingProfile.name || "";
+                    gender = existingProfile.gender || "";
+                    birthday = existingProfile.birthday || "";
+                    phone = existingProfile.phone || "";
+                    email = existingProfile.email || "";
+                    consultHistory = existingProfile.consult_history || "";
+                    medicalHistory = existingProfile.medical_history || "";
+                }
+
+                // 校验预约日期、时段，及若填写区域显示时需确保姓名不为空
+                if (!appointmentDate || !timeSlot || ((profileSectionDisplay !== "none") && !name)) {
                     alert("请填写完整预约信息！");
                     return;
                 }

@@ -636,31 +636,13 @@ app.get('/api/doctorAppointments', (req, res) => {
         return res.status(400).json({ error: '缺少 doctorId 参数' });
     }
     const sql = `
-  SELECT 
-    a.id, 
-    a.user_id, 
-    a.doctor_id, 
-    a.date, 
-    a.time_slot, 
-    a.end_time, 
-    a.status, 
-    a.created_at,
-    u.username AS userName,
-    MAX(p.name) AS profileName,
-    MAX(p.gender) AS gender,
-    MAX(p.birthday) AS birthday,
-    MAX(p.phone) AS phone,
-    MAX(p.email) AS email,
-    MAX(p.consult_history) AS consult_history,
-    MAX(p.medical_history) AS medical_history
-  FROM appointments a
-  LEFT JOIN users u ON a.user_id = u.id
-  LEFT JOIN user_profiles p ON a.user_id = p.user_id
-  WHERE a.doctor_id = ? AND a.status = '待处理'
-  GROUP BY a.id, a.user_id, a.doctor_id, a.date, a.time_slot, a.end_time, a.status, a.created_at, u.username
-  ORDER BY a.created_at ASC
-`;
-
+      SELECT a.*, u.username AS userName, p.name AS profileName, p.gender, p.birthday, p.phone, p.email, p.consult_history, p.medical_history
+      FROM appointments a
+      LEFT JOIN users u ON a.user_id = u.id
+      LEFT JOIN user_profiles p ON a.user_id = p.user_id
+      WHERE a.doctor_id = ? AND a.status = '待处理'
+      ORDER BY a.created_at ASC
+    `;
     db.query(sql, [doctorId], (err, results) => {
         if (err) {
             console.error('查询医生预约记录失败:', err);

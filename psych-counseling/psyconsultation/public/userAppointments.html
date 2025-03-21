@@ -114,17 +114,22 @@
           tableBody.innerHTML = '<tr><td colspan="5" class="text-center">暂无预约记录</td></tr>';
           return;
         }
-        data.forEach(appt => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${appt.doctorName || '未知医生'}</td>
-            <td>${appt.date}</td>
-            <td>${appt.time_slot}</td>
-            <td>${appt.status}</td>
-            <td><button class="btn btn-danger btn-sm cancelBtn" data-id="${appt.id}">取消</button></td>
-          `;
-          tableBody.appendChild(row);
-        });
+          data.forEach(appt => {
+              const dateObj = new Date(appt.date);
+              // 使用自定义函数格式化日期为 YYYY-MM-DD
+              const formattedDate = `${dateObj.getFullYear()}-${(dateObj.getMonth() + 1).toString().padStart(2, '0')}-${dateObj.getDate().toString().padStart(2, '0')}`;
+
+              const row = document.createElement('tr');
+              row.innerHTML = `
+    <td>${appt.doctorName || '未知医生'}</td>
+    <td>${formattedDate}</td>
+    <td>${appt.time_slot}</td>
+    <td>${appt.status}</td>
+    <td><button class="btn btn-danger btn-sm cancelBtn" data-id="${appt.id}">取消</button></td>
+  `;
+              tableBody.appendChild(row);
+          });
+
 
         // 为所有取消按钮绑定事件
         document.querySelectorAll('.cancelBtn').forEach(btn => {

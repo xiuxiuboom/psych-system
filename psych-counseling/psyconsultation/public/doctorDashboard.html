@@ -70,7 +70,7 @@
         </div>
     </div>
 
-    <!-- 固定页脚（可选择固定或相对） -->
+    <!-- 固定页脚（采用相对定位） -->
     <footer class="bg-primary text-white text-center py-2" style="position: relative; width: 100%;">
         <div class="container">
             <p class="mb-0">&copy; 2025 心理咨询中心. 版权所有.</p>
@@ -99,28 +99,74 @@
         // 显示医生姓名在导航栏中
         document.getElementById("doctorNameDisplay").textContent = localStorage.getItem("username");
 
-        // 格式化日期为 YYYY-MM-DD
-        function formatDate(isoString) {
-            const dateObj = new Date(isoString);
+        // 修改格式化函数：如果传入的字符串长度正好为10（YYYY-MM-DD格式），则直接返回
+        function formatDate(dateStr) {
+            // 如果传入的字符串已经符合 YYYY-MM-DD 格式，则直接返回
+            if (dateStr && dateStr.length === 10) {
+                return dateStr;
+            }
+            const dateObj = new Date(dateStr);
             const year = dateObj.getFullYear();
             const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
             const day = dateObj.getDate().toString().padStart(2, '0');
             return `${year}-${month}-${day}`;
         }
 
+        // 获取当前时间，并转换为 yyyy-MM-dd HH:mm 格式
+        function getCurrentDateTime() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = (now.getMonth() + 1).toString().padStart(2, '0');
+            const day = now.getDate().toString().padStart(2, '0');
+            const hours = now.getHours().toString().padStart(2, '0');
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            return {
+                date: `${year}-${month}-${day}`,
+                time: `${hours}:${minutes}`
+            };
+        }
+
+        // 判断预约是否过期，比较预约的结束时间而不是起始时间
+        function isAppointmentExpired(apptDate, apptTimeSlot) {
+            const { date: currentDate, time: currentTime } = getCurrentDateTime();
+            if (apptDate < currentDate) {
+                return true; // 预约日期早于今天，已过期
+            } else if (apptDate === currentDate) {
+                // 如果时段分隔符可能是 "~" 或 "-"
+                let parts;
+                if (apptTimeSlot.indexOf("~") !== -1) {
+                    parts = apptTimeSlot.split("~").map(t => t.trim());
+                } else if (apptTimeSlot.indexOf("-") !== -1) {
+                    parts = apptTimeSlot.split("-").map(t => t.trim());
+                } else {
+                    return true; // 格式错误时，视为过期
+                }
+                if (parts.length < 2) return true;
+                const endTime = parts[1]; // 预约结束时间，例如 "15:30"
+                // 当天预约，只有当前时间大于等于结束时间时才认为过期
+                return currentTime >= endTime;
+            }
+            return false; // 未来日期的预约，不算过期
+        }
+
+
         // 获取待处理预约记录
         async function loadAppointments() {
             try {
                 const response = await fetch(`/api/doctorAppointments?doctorId=${doctorId}`);
                 if (response.ok) {
-                    const appointments = await response.json();
+                    let appointments = await response.json();
                     const tableBody = document.getElementById("appointmentTableBody");
                     tableBody.innerHTML = "";
+
+                    // 过滤掉已过期的预约
+                    appointments = appointments.filter(appt => !isAppointmentExpired(formatDate(appt.date), appt.time_slot));
+
                     if (appointments.length === 0) {
                         tableBody.innerHTML = `<tr><td colspan="4" class="text-center">暂无待处理预约记录</td></tr>`;
                         return;
                     }
-                    // 遍历预约记录（已按创建时间排序，先来先服务）
+
                     appointments.forEach(appt => {
                         const formattedDate = formatDate(appt.date);
                         const row = document.createElement("tr");

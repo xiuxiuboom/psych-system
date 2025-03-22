@@ -629,38 +629,37 @@ app.delete('/api/appointments/:id', (req, res) => {
 });
 
 //医生端的处理预约
-// 获取当前医生的待处理预约记录，按预约创建顺序排列
+// 获取当前医生的待处理预约记录，按创建时间排序
 app.get('/api/doctorAppointments', (req, res) => {
     const doctorId = req.query.doctorId;
     if (!doctorId) {
         return res.status(400).json({ error: '缺少 doctorId 参数' });
     }
     const sql = `
-  SELECT 
-    a.id, 
-    a.user_id, 
-    a.doctor_id, 
-    a.date, 
-    a.time_slot, 
-    a.end_time, 
-    a.status, 
-    a.created_at,
-    u.username AS userName,
-    MAX(p.name) AS profileName,
-    MAX(p.gender) AS gender,
-    MAX(p.birthday) AS birthday,
-    MAX(p.phone) AS phone,
-    MAX(p.email) AS email,
-    MAX(p.consult_history) AS consult_history,
-    MAX(p.medical_history) AS medical_history
-  FROM appointments a
-  LEFT JOIN users u ON a.user_id = u.id
-  LEFT JOIN user_profiles p ON a.user_id = p.user_id
-  WHERE a.doctor_id = ? AND a.status = '待处理'
-  GROUP BY a.id, a.user_id, a.doctor_id, a.date, a.time_slot, a.end_time, a.status, a.created_at, u.username
-  ORDER BY a.created_at ASC
-`;
-
+      SELECT 
+        a.id, 
+        a.user_id, 
+        a.doctor_id, 
+        DATE_FORMAT(a.date, '%Y-%m-%d') AS date, 
+        a.time_slot, 
+        a.end_time, 
+        a.status, 
+        a.created_at,
+        u.username AS userName,
+        MAX(p.name) AS profileName,
+        MAX(p.gender) AS gender,
+        DATE_FORMAT(MAX(p.birthday), '%Y-%m-%d') AS birthday,
+        MAX(p.phone) AS phone,
+        MAX(p.email) AS email,
+        MAX(p.consult_history) AS consult_history,
+        MAX(p.medical_history) AS medical_history
+      FROM appointments a
+      LEFT JOIN users u ON a.user_id = u.id
+      LEFT JOIN user_profiles p ON a.user_id = p.user_id
+      WHERE a.doctor_id = ? AND a.status = '待处理'
+      GROUP BY a.id, a.user_id, a.doctor_id, a.date, a.time_slot, a.end_time, a.status, a.created_at, u.username
+      ORDER BY a.created_at ASC
+    `;
     db.query(sql, [doctorId], (err, results) => {
         if (err) {
             console.error('查询医生预约记录失败:', err);
@@ -669,6 +668,8 @@ app.get('/api/doctorAppointments', (req, res) => {
         res.json(results);
     });
 });
+
+
 
 //根据用户 ID 查询用户档案
 //这样前端可以调用 /api/userProfile?userId=xxx 判断是否存在档案数据。

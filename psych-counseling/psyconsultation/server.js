@@ -8,6 +8,10 @@ const bcrypt = require('bcrypt');  // 用于加密和比较密码
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
+// 用于保存已开放聊天室的医生ID，结构为 { doctorId1: true, doctorId2: true, ... }
+const activeChatrooms = {};
+// 用于记录各个医生的聊天室是否已开启（简单的内存存储，生产环境建议持久化）
+const openChats = {};
 
 
 
@@ -331,8 +335,6 @@ app.get('/api/articles', (req, res) => {
 });
 
 
-
-
 // 获取单个文章详情
 app.get('/api/article', (req, res) => {
     const id = parseInt(req.query.id);
@@ -425,6 +427,61 @@ app.get('/api/announcement', (req, res) => {
         res.json(results[0]);
     });
 });
+
+// 医生开放聊天室接口
+// 请求体应包含 { doctorId: "4" }
+// 医生开启聊天室接口
+app.post('/api/openChat', (req, res) => {
+    const { doctorId } = req.body;
+    if (!doctorId) {
+        return res.status(400).json({ error: '缺少 doctorId 参数' });
+    }
+    const sql = 'UPDATE users SET chat_status = "open" WHERE id = ? AND role = "心理医生"';
+    db.query(sql, [doctorId], (err, result) => {
+        if (err) {
+            console.error('开启聊天室失败:', err);
+            return res.status(500).json({ error: '开启聊天室失败' });
+        }
+        if (result.affectedRows === 0) {
+            return res.status(400).json({ error: '医生不存在或无权限' });
+        }
+        // 可打印日志
+        console.log(`医生 ${doctorId} 开放了聊天室`);
+        res.json({ success: true });
+    });
+});
+
+
+// 检查指定医生聊天室是否已开放
+// 请求参数：doctorId
+app.get('/api/checkChatroom', (req, res) => {
+    const { doctorId } = req.query;
+    if (!doctorId) {
+        return res.status(400).json({ error: '缺少 doctorId 参数' });
+    }
+    const chatroomOpen = activeChatrooms[doctorId] || false;
+    return res.json({ chatroomOpen });
+});
+
+// 更新医生聊天室状态为 closed 的接口
+app.post('/api/closeChat', (req, res) => {
+    const { doctorId } = req.body;
+    if (!doctorId) {
+        return res.status(400).json({ error: '缺少 doctorId 参数' });
+    }
+    const sql = 'UPDATE users SET chat_status = "closed" WHERE id = ?';
+    db.query(sql, [doctorId], (err, result) => {
+        if (err) {
+            console.error('更新聊天室状态失败:', err);
+            return res.status(500).json({ error: '更新聊天室状态失败' });
+        }
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: '医生未找到' });
+        }
+        res.json({ success: true });
+    });
+});
+
 
 
 // 获取所有医生信息（从 users 表中筛选角色为“心理医生”的记录）
@@ -691,6 +748,85 @@ app.get('/api/userProfile', (req, res) => {
         res.json(results[0]);
     });
 });
+
+// 医生端：开启聊天室（开始处理咨询申请）
+// 请求方式：POST
+// 请求体中必须包含：doctorId
+app.post('/api/startChat', (req, res) => {
+    const { doctorId } = req.body;
+    if (!doctorId) {
+        return res.status(400).json({ error: '缺少 doctorId 参数' });
+    }
+    // 更新用户表中该医生的 chat_status 字段
+    const sql = 'UPDATE users SET chat_status = "open" WHERE id = ? AND role = "心理医生"';
+    db.query(sql, [doctorId], (err, result) => {
+        if (err) {
+            console.error('开启聊天室失败:', err);
+            return res.status(500).json({ error: '开启聊天室失败' });
+        }
+        if (result.affectedRows === 0) {
+            return res.status(400).json({ error: '未找到医生记录或无权限' });
+        }
+        console.log(`医生 ${doctorId} 开放了聊天室`);
+        res.json({ success: true });
+    });
+});
+
+// 普通用户或其他端：检查指定医生的聊天室状态
+// 请求方式：GET
+// 请求参数：doctorId
+app.get('/api/checkChatStatus', (req, res) => {
+    const { doctorId } = req.query;
+    if (!doctorId) {
+        return res.status(400).json({ error: '缺少 doctorId 参数' });
+    }
+    const sql = 'SELECT chat_status FROM users WHERE id = ? AND role = "心理医生"';
+    db.query(sql, [doctorId], (err, results) => {
+        if (err) {
+            console.error('检查聊天室状态失败:', err);
+            return res.status(500).json({ error: '检查聊天室状态失败' });
+        }
+        if (results.length === 0) {
+            return res.status(404).json({ error: '医生未找到' });
+        }
+        res.json({ chatStatus: results[0].chat_status });
+    });
+});
+
+// 新增接口：医生开启聊天室
+app.post('/api/openChat', (req, res) => {
+    const { doctorId } = req.body;
+    if (!doctorId) {
+        return res.status(400).json({ error: '缺少 doctorId 参数' });
+    }
+    // 标记该医生的聊天室为已开启
+    openChats[doctorId] = true;
+    console.log(`医生 ${doctorId} 开放了聊天室`);
+    return res.json({ success: true });
+});
+
+// 新增：关闭聊天室接口
+app.post('/api/closeChat', (req, res) => {
+    const { doctorId } = req.body;
+    if (!doctorId) {
+        return res.status(400).json({ error: '缺少 doctorId 参数' });
+    }
+    // 将该医生的聊天室状态设为 false 或删除记录
+    openChats[doctorId] = false;
+    console.log(`医生 ${doctorId} 关闭了聊天室`);
+    return res.json({ success: true });
+});
+
+// 检查聊天室状态接口（供普通用户调用）
+app.get('/api/checkChatStatus', (req, res) => {
+    const doctorId = req.query.doctorId;
+    if (!doctorId) {
+        return res.status(400).json({ error: '缺少 doctorId 参数' });
+    }
+    const chatStatus = openChats[doctorId] ? "open" : "closed";
+    res.json({ chatStatus });
+});
+
 
 
 // 启动服务器

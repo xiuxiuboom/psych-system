@@ -6,14 +6,14 @@
     <!-- 引入 Bootswatch Cosmo 主题 -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootswatch/4.5.2/cosmo/bootstrap.min.css">
     <style>
-        /* 页面背景 */
+        /* 页面背景及布局样式 */
         body {
             background-color: #f8f9fa;
         }
-        /* 顶部导航栏、聊天容器、页脚样式 */
+
         #chatContainer {
             max-width: 800px;
-            margin: 80px auto 100px; /* 上下间距 */
+            margin: 80px auto 100px;
             background-color: #fff;
             padding: 20px;
             border: 1px solid #ddd;
@@ -52,6 +52,13 @@
             clear: both;
         }
 
+        .system-message {
+            text-align: center;
+            color: #888;
+            margin: 10px 0;
+            font-style: italic;
+        }
+
         .clearfix {
             clear: both;
         }
@@ -79,9 +86,6 @@
             <ul class="navbar-nav mr-auto">
                 <li class="nav-item">
                     <a class="nav-link" href="doctorList.html">咨询医生</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="appointment.html">咨询记录</a>
                 </li>
             </ul>
         </div>
@@ -119,20 +123,27 @@
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        // 解析 URL 参数，获取 doctorId
+        // 从 URL 参数中获取 doctorId
         const params = new URLSearchParams(window.location.search);
         const doctorId = params.get('doctorId');
-
-        // 显示医生信息（这里简单显示 doctorId，后续可以调用 API 获取详细信息）
         if (doctorId) {
             document.getElementById("doctorInfo").innerHTML = `<h2>正在咨询医生：${doctorId}</h2>`;
         }
 
-        // 连接到 Node.js 中转服务，端口需与 server.js 中设置一致
-        const ws = new WebSocket("ws://localhost:8081");
+        // 创建 WebSocket 连接（使用后端中转服务器端口，与 server.js 中对应）
+        const ws = new WebSocket("ws://localhost:8080");
 
         ws.onopen = () => {
             console.log("已连接聊天服务");
+            // 根据当前用户角色发送系统提示消息
+            const role = localStorage.getItem("role");
+            const joinMessage = (role === "心理医生") ? "医生已进入咨询室" : "用户已进入咨询室";
+            const sysMsg = JSON.stringify({
+                type: "system",
+                content: joinMessage,
+                timestamp: new Date().toISOString()
+            });
+            ws.send(sysMsg);
         };
 
         ws.onmessage = (event) => {
@@ -143,17 +154,30 @@
             } catch (e) {
                 msgObj = { content: event.data, sender: "对方" };
             }
-            const messageDiv = document.createElement("div");
-            messageDiv.classList.add("message");
-            // 如果 sender 为 "用户"，说明是自己发出的消息，显示在右边；否则显示在左边
-            if (msgObj.sender === "用户") {
-                messageDiv.classList.add("message-sent");
-            } else {
-                messageDiv.classList.add("message-received");
+
+            // 获取当前客户端角色
+            const localRole = localStorage.getItem("role");
+            // 判断是否为自己发送的消息
+            let isSelf = false;
+            if ((localRole === "心理医生" && msgObj.sender === "医生") ||
+                (localRole !== "心理医生" && msgObj.sender === "用户")) {
+                isSelf = true;
             }
-            messageDiv.textContent = msgObj.content;
+
+            const messageDiv = document.createElement("div");
+            if (msgObj.type === "system") {
+                messageDiv.classList.add("system-message");
+                messageDiv.textContent = msgObj.content;
+            } else {
+                messageDiv.classList.add("message");
+                if (isSelf) {
+                    messageDiv.classList.add("message-sent");
+                } else {
+                    messageDiv.classList.add("message-received");
+                }
+                messageDiv.textContent = msgObj.content;
+            }
             document.getElementById("chatBox").appendChild(messageDiv);
-            // 添加 clearfix 确保布局正确
             const clearfix = document.createElement("div");
             clearfix.classList.add("clearfix");
             document.getElementById("chatBox").appendChild(clearfix);
@@ -163,30 +187,48 @@
             const input = document.getElementById("messageInput");
             const msg = input.value.trim();
             if (!msg) return;
-            // 构造 JSON 消息，附加 doctorId（便于后续处理）
+            const role = localStorage.getItem("role");
+            const senderLabel = (role === "心理医生") ? "医生" : "用户";
             const jsonMsg = JSON.stringify({
-                sender: "用户", // 替换为真实登录用户信息
+                sender: senderLabel,
                 timestamp: new Date().toISOString(),
                 content: msg,
                 doctorId: doctorId
             });
-            ws.send(jsonMsg);
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(jsonMsg);
+            }
             input.value = "";
-            // 立即在聊天框显示自己发送的消息（右侧显示）
-            const messageDiv = document.createElement("div");
-            messageDiv.classList.add("message", "message-sent");
-            messageDiv.textContent = msg;
-            document.getElementById("chatBox").appendChild(messageDiv);
-            const clearfix = document.createElement("div");
-            clearfix.classList.add("clearfix");
-            document.getElementById("chatBox").appendChild(clearfix);
         };
 
-        document.getElementById("exitButton").onclick = () => {
+        // 退出聊天按钮点击事件，根据角色跳转不同页面，并调用关闭聊天室接口（医生端）
+        document.getElementById("exitButton").onclick = async () => {
             ws.close();
-            // 退出后可跳转回医生列表页面，或弹出评价窗口（后续扩展）
-            window.location.href = "doctorList.html";
+            // 调用接口更新医生的聊天室状态为 closed
+            try {
+                const res = await fetch('/api/closeChat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ doctorId: localStorage.getItem("userId") })
+                });
+                const result = await res.json();
+                if (res.ok && result.success) {
+                    console.log(`医生 ${localStorage.getItem("userId")} 关闭了聊天室`);
+                } else {
+                    console.error("关闭聊天室失败：", result.error);
+                }
+            } catch (err) {
+                console.error("调用关闭聊天室接口出错：", err);
+            }
+            // 根据角色跳转页面
+            const role = localStorage.getItem("role");
+            if (role === "心理医生") {
+                window.location.href = "doctorDashboard.html";
+            } else {
+                window.location.href = "doctorList.html";
+            }
         };
+
     </script>
 </body>
 </html>

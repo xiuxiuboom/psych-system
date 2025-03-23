@@ -51,6 +51,10 @@
     </nav>
 
     <div class="container">
+        <div class="container my-3">
+            <button id="openChatBtn" class="btn btn-success">开始处理咨询申请</button>
+        </div>
+
         <h2 class="text-center mb-4">待处理预约记录</h2>
         <!-- 预约记录显示区域 -->
         <div class="table-responsive">
@@ -198,6 +202,35 @@
         document.addEventListener("DOMContentLoaded", () => {
             loadAppointments();
         });
+
+        //调用后端接口开放聊天室并跳转到聊天页面
+        document.getElementById("openChatBtn").addEventListener("click", async () => {
+            const doctorId = localStorage.getItem("userId");
+            if (!doctorId) {
+                alert("无法获取医生ID，请重新登录！");
+                window.location.href = "login.html";
+                return;
+            }
+            try {
+                const response = await fetch('/api/openChat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ doctorId })
+                });
+                const result = await response.json();
+                if (response.ok && result.success) {
+                    alert("聊天室已开启！");
+                    // 可跳转到聊天室页面
+                    window.location.href = `chat.html?doctorId=${doctorId}`;
+                } else {
+                    alert("开启聊天室失败：" + (result.error || "未知错误"));
+                }
+            } catch (error) {
+                console.error("调用开启聊天室接口出错：", error);
+                alert("调用开启聊天室接口出错");
+            }
+        });
+
     </script>
 </body>
 </html>

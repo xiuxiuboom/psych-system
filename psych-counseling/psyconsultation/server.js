@@ -464,6 +464,7 @@ app.get('/api/checkChatroom', (req, res) => {
 });
 
 // 更新医生聊天室状态为 closed 的接口
+// 更新医生聊天室状态为 closed 的接口
 app.post('/api/closeChat', (req, res) => {
     const { doctorId } = req.body;
     if (!doctorId) {
@@ -481,6 +482,7 @@ app.post('/api/closeChat', (req, res) => {
         res.json({ success: true });
     });
 });
+
 
 
 
@@ -827,7 +829,25 @@ app.get('/api/checkChatStatus', (req, res) => {
     res.json({ chatStatus });
 });
 
-
+// 获取医生聊天室状态接口
+app.get('/api/getChatStatus', (req, res) => {
+    const doctorId = req.query.doctorId;
+    if (!doctorId) {
+        return res.status(400).json({ error: '缺少 doctorId 参数' });
+    }
+    // 假设在 users 表中存储了聊天室状态，字段名为 chat_status
+    const sql = 'SELECT chat_status FROM users WHERE id = ?';
+    db.query(sql, [doctorId], (err, results) => {
+        if (err) {
+            console.error('查询聊天室状态失败:', err);
+            return res.status(500).json({ error: '查询聊天室状态失败' });
+        }
+        if (results.length === 0) {
+            return res.status(404).json({ error: '医生未找到' });
+        }
+        res.json({ chat_status: results[0].chat_status });
+    });
+});
 
 // 启动服务器
 const PORT = 3000;

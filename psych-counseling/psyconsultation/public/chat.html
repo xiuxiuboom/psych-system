@@ -84,6 +84,7 @@
         </button>
         <div class="collapse navbar-collapse" id="navbarContent">
             <ul class="navbar-nav mr-auto">
+                <!-- 可根据需要添加其他导航项 -->
                 <li class="nav-item">
                     <a class="nav-link" href="doctorList.html">咨询医生</a>
                 </li>
@@ -93,8 +94,12 @@
 
     <!-- 聊天容器 -->
     <div id="chatContainer" class="container">
-        <!-- 显示医生信息 -->
-        <div id="doctorInfo"></div>
+        <!-- 显示医生或用户的提示信息 -->
+        <div id="doctorInfo">
+            <!-- 医生端初始显示等待用户进入 -->
+            <!-- 普通用户端可由后续消息显示医院医生的信息 -->
+            <h2 id="infoHeader"></h2>
+        </div>
         <!-- 聊天框 -->
         <div id="chatBox"></div>
         <!-- 消息输入区域 -->
@@ -126,26 +131,46 @@
         // 从 URL 参数中获取 doctorId
         const params = new URLSearchParams(window.location.search);
         const doctorId = params.get('doctorId');
-        if (doctorId) {
-            document.getElementById("doctorInfo").innerHTML = `<h2>正在咨询医生：${doctorId}</h2>`;
+
+        // 获取当前用户角色
+        const localRole = localStorage.getItem("role");
+
+        // 设置初始提示信息
+        if (localRole === "心理医生") {
+            // 医生端初始提示等待用户进入
+            document.getElementById("infoHeader").textContent = "等待用户进入咨询室…";
+        } else {
+            // 普通用户端提示医生信息（可根据需要调整）
+            document.getElementById("infoHeader").textContent = "正在咨询医生：" + doctorId;
         }
 
-        // 创建 WebSocket 连接（使用后端中转服务器端口，与 server.js 中对应）
+        // 创建 WebSocket 连接（使用后端中转服务器的端口，与 server.js 中一致）
         const ws = new WebSocket("ws://localhost:8080");
 
         ws.onopen = () => {
             console.log("已连接聊天服务");
-            // 根据当前用户角色发送系统提示消息
-            const role = localStorage.getItem("role");
-            const joinMessage = (role === "心理医生") ? "医生已进入咨询室" : "用户已进入咨询室";
-            const sysMsg = JSON.stringify({
-                type: "system",
-                content: joinMessage,
-                timestamp: new Date().toISOString()
-            });
-            ws.send(sysMsg);
+            if (localRole !== "心理医生") {
+                // 普通用户进入聊天室时，发送 join 消息，包含用户名
+                const username = localStorage.getItem("username") || "用户";
+                const joinMsg = JSON.stringify({
+                    type: "join", // 标识为加入消息
+                    sender: "用户", // 普通用户
+                    username: username,
+                    timestamp: new Date().toISOString()
+                });
+                ws.send(joinMsg);
+            } else {
+                // 医生端进入聊天室发送系统消息
+                const sysMsg = JSON.stringify({
+                    type: "system",
+                    sender: "医生",
+                    content: "医生已进入咨询室",
+                    timestamp: new Date().toISOString()
+                });
+                ws.send(sysMsg);
+            }
         };
-
+        
         ws.onmessage = (event) => {
             console.log("收到消息:", event.data);
             let msgObj;
@@ -155,39 +180,55 @@
                 msgObj = { content: event.data, sender: "对方" };
             }
 
-            // 获取当前客户端角色
             const localRole = localStorage.getItem("role");
-            // 判断是否为自己发送的消息
-            let isSelf = false;
-            if ((localRole === "心理医生" && msgObj.sender === "医生") ||
-                (localRole !== "心理医生" && msgObj.sender === "用户")) {
-                isSelf = true;
+
+            // 如果当前为医生端，且收到的是用户的加入消息
+            if (localRole === "心理医生" && msgObj.type === "join" && msgObj.sender === "用户" && msgObj.username) {
+                // 更新页面顶部提示：例如显示正在为该用户提供咨询服务
+                document.getElementById("doctorInfo").innerHTML = `<h2>正在为用户：${msgObj.username} 提供咨询服务</h2>`;
+                // 在聊天框中追加系统消息“用户已进入咨询室”
+                const sysMsgDiv = document.createElement("div");
+                sysMsgDiv.className = "system-message";
+                sysMsgDiv.textContent = "用户已进入咨询室";
+                document.getElementById("chatBox").appendChild(sysMsgDiv);
+                return; // 处理完join消息，不再做其他处理
             }
 
-            const messageDiv = document.createElement("div");
+            // 系统消息处理（type === "system"），直接显示
             if (msgObj.type === "system") {
-                messageDiv.classList.add("system-message");
-                messageDiv.textContent = msgObj.content;
-            } else {
-                messageDiv.classList.add("message");
-                if (isSelf) {
-                    messageDiv.classList.add("message-sent");
-                } else {
-                    messageDiv.classList.add("message-received");
-                }
-                messageDiv.textContent = msgObj.content;
+                const systemDiv = document.createElement("div");
+                systemDiv.className = "system-message";
+                systemDiv.textContent = msgObj.content;
+                document.getElementById("chatBox").appendChild(systemDiv);
+                return;
             }
+
+            // 普通聊天消息处理，根据发送者判断左右显示
+            const messageDiv = document.createElement("div");
+            messageDiv.classList.add("message");
+            // 判断是否为自己发送的消息：医生端如果消息的 sender 为 "医生"，则显示在右侧；用户端如果 sender 为 "用户"，则显示在右侧
+            if ((localRole === "心理医生" && msgObj.sender === "医生") ||
+                (localRole !== "心理医生" && msgObj.sender === "用户")) {
+                messageDiv.classList.add("message-sent");
+            } else {
+                messageDiv.classList.add("message-received");
+            }
+            messageDiv.textContent = msgObj.content;
             document.getElementById("chatBox").appendChild(messageDiv);
+
             const clearfix = document.createElement("div");
             clearfix.classList.add("clearfix");
             document.getElementById("chatBox").appendChild(clearfix);
         };
 
+
+        // 点击发送按钮，发送普通消息
         document.getElementById("sendButton").onclick = () => {
             const input = document.getElementById("messageInput");
             const msg = input.value.trim();
             if (!msg) return;
-            const role = localStorage.getItem("role");
+
+            const role = localRole;
             const senderLabel = (role === "心理医生") ? "医生" : "用户";
             const jsonMsg = JSON.stringify({
                 sender: senderLabel,
@@ -201,34 +242,40 @@
             input.value = "";
         };
 
-        // 退出聊天按钮点击事件，根据角色跳转不同页面，并调用关闭聊天室接口（医生端）
+        // 退出聊天按钮点击事件，根据角色跳转不同页面，并在医生端调用关闭聊天室接口
         document.getElementById("exitButton").onclick = async () => {
-            ws.close();
-            // 调用接口更新医生的聊天室状态为 closed
-            try {
-                const res = await fetch('/api/closeChat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ doctorId: localStorage.getItem("userId") })
-                });
-                const result = await res.json();
-                if (res.ok && result.success) {
-                    console.log(`医生 ${localStorage.getItem("userId")} 关闭了聊天室`);
-                } else {
-                    console.error("关闭聊天室失败：", result.error);
+            if (localRole === "心理医生") {
+                try {
+                    const res = await fetch('/api/closeChat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ doctorId: localStorage.getItem("userId") })
+                    });
+                    const result = await res.json();
+                    if (res.ok && result.success) {
+                        const sysMsg = JSON.stringify({
+                            type: "system",
+                            content: "医生已退出咨询室，往后消息将不被记录",
+                            timestamp: new Date().toISOString()
+                        });
+                        if (ws.readyState === WebSocket.OPEN) {
+                            ws.send(sysMsg);
+                        }
+                    } else {
+                        alert("关闭聊天室失败：" + (result.error || "未知错误"));
+                    }
+                } catch (error) {
+                    console.error("调用关闭聊天室接口出错：", error);
+                    alert("调用关闭聊天室接口出错");
                 }
-            } catch (err) {
-                console.error("调用关闭聊天室接口出错：", err);
-            }
-            // 根据角色跳转页面
-            const role = localStorage.getItem("role");
-            if (role === "心理医生") {
+                // 跳转到医生工作台
                 window.location.href = "doctorDashboard.html";
             } else {
+                // 普通用户退出聊天直接跳转到医生列表页面
+                ws.close();
                 window.location.href = "doctorList.html";
             }
         };
-
     </script>
 </body>
 </html>

@@ -108,6 +108,50 @@ app.post('/api/register', (req, res) => {
     });
 });
 
+// 修改密码接口
+app.post('/api/changePassword', (req, res) => {
+    const { userId, oldPassword, newPassword } = req.body;
+    if (!userId || !oldPassword || !newPassword) {
+        return res.status(400).json({ error: '缺少必填参数' });
+    }
+
+    // 查询用户当前的密码
+    db.query('SELECT password FROM users WHERE id = ?', [userId], (err, results) => {
+        if (err) {
+            console.error('查询用户密码失败:', err);
+            return res.status(500).json({ error: '查询用户密码失败' });
+        }
+        if (results.length === 0) {
+            return res.status(400).json({ error: '用户不存在' });
+        }
+        const currentHashedPassword = results[0].password;
+        // 比较旧密码是否正确
+        bcrypt.compare(oldPassword, currentHashedPassword, (err, isMatch) => {
+            if (err) {
+                console.error('密码比对失败:', err);
+                return res.status(500).json({ error: '密码比对失败' });
+            }
+            if (!isMatch) {
+                return res.status(400).json({ error: '旧密码不正确' });
+            }
+            // 对新密码进行加密，并更新数据库
+            bcrypt.hash(newPassword, 10, (err, newHashedPassword) => {
+                if (err) {
+                    console.error('新密码加密失败:', err);
+                    return res.status(500).json({ error: '新密码加密失败' });
+                }
+                db.query('UPDATE users SET password = ? WHERE id = ?', [newHashedPassword, userId], (err, result) => {
+                    if (err) {
+                        console.error('更新密码失败:', err);
+                        return res.status(500).json({ error: '更新密码失败' });
+                    }
+                    res.json({ success: true });
+                });
+            });
+        });
+    });
+});
+
 app.get('/api/quotes', (req, res) => {
     db.query('SELECT * FROM quotes ORDER BY created_at DESC', (err, results) => {
         if (err) {

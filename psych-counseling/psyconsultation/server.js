@@ -508,7 +508,6 @@ app.get('/api/checkChatroom', (req, res) => {
 });
 
 // 更新医生聊天室状态为 closed 的接口
-// 更新医生聊天室状态为 closed 的接口
 app.post('/api/closeChat', (req, res) => {
     const { doctorId } = req.body;
     if (!doctorId) {
@@ -527,6 +526,44 @@ app.post('/api/closeChat', (req, res) => {
     });
 });
 
+// 新增接口：普通用户加入医生聊天室
+// 请求体中应包含 { userId, doctorId }
+app.post('/api/joinChat', (req, res) => {
+    const { userId, doctorId } = req.body;
+    if (!userId || !doctorId) {
+        return res.status(400).json({ error: '缺少 userId 或 doctorId 参数' });
+    }
+    // 如果当前该医生聊天室中没有普通用户，则允许加入
+    if (!activeChatrooms[doctorId]) {
+        activeChatrooms[doctorId] = userId;
+        console.log(`用户 ${userId} 成功加入医生 ${doctorId} 的聊天室`);
+        return res.json({ code: 0, msg: '可以进入咨询室' });
+    } else {
+        // 如果已经存在，并且当前用户与已有的不是同一个，则返回等待提示
+        if (activeChatrooms[doctorId] !== userId) {
+            console.log(`用户 ${userId} 尝试加入医生 ${doctorId} 的聊天室，但已有用户 ${activeChatrooms[doctorId]} 存在`);
+            return res.json({ code: 3, msg: '请等待医生叫号' });
+        }
+        // 如果是同一个用户（重入情况），允许进入
+        return res.json({ code: 0, msg: '可以进入咨询室' });
+    }
+});
+
+
+// 新增接口：普通用户离开医生聊天室
+// 请求体中应包含 { userId, doctorId }
+app.post('/api/leaveChat', (req, res) => {
+    const { userId, doctorId } = req.body;
+    if (!userId || !doctorId) {
+        return res.status(400).json({ error: '缺少 userId 或 doctorId 参数' });
+    }
+    // 如果该医生的聊天室中记录的用户正是当前用户，则清除记录
+    if (activeChatrooms[doctorId] && activeChatrooms[doctorId] === userId) {
+        delete activeChatrooms[doctorId];
+        console.log(`用户 ${userId} 离开了医生 ${doctorId} 的聊天室`);
+    }
+    return res.json({ success: true });
+});
 
 
 
@@ -851,17 +888,27 @@ app.post('/api/openChat', (req, res) => {
     return res.json({ success: true });
 });
 
-// 新增：关闭聊天室接口
 app.post('/api/closeChat', (req, res) => {
     const { doctorId } = req.body;
     if (!doctorId) {
         return res.status(400).json({ error: '缺少 doctorId 参数' });
     }
-    // 将该医生的聊天室状态设为 false 或删除记录
-    openChats[doctorId] = false;
-    console.log(`医生 ${doctorId} 关闭了聊天室`);
-    return res.json({ success: true });
+    const sql = 'UPDATE users SET chat_status = "closed" WHERE id = ?';
+    db.query(sql, [doctorId], (err, result) => {
+        if (err) {
+            console.error('更新聊天室状态失败:', err);
+            return res.status(500).json({ error: '更新聊天室状态失败' });
+        }
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: '医生未找到' });
+        }
+        // 清除该医生聊天室中的用户记录
+        delete activeChatrooms[doctorId];
+        console.log(`医生 ${doctorId} 关闭了聊天室`);
+        res.json({ success: true });
+    });
 });
+
 
 // 检查聊天室状态接口（供普通用户调用）
 app.get('/api/checkChatStatus', (req, res) => {
@@ -892,6 +939,76 @@ app.get('/api/getChatStatus', (req, res) => {
         res.json({ chat_status: results[0].chat_status });
     });
 });
+
+app.get('/api/checkConsultFlow', (req, res) => {
+    const { userId, doctorId } = req.query;
+    if (!userId || !doctorId) {
+        return res.status(400).json({ error: '缺少 userId 或 doctorId 参数' });
+    }
+
+    // 1. 查找该用户对该医生的最近一条“待处理”预约记录
+    const sql = `
+      SELECT * FROM appointments 
+      WHERE user_id = ? AND doctor_id = ? AND status = "待处理"
+      ORDER BY created_at DESC LIMIT 1
+    `;
+    db.query(sql, [userId, doctorId], (err, results) => {
+        if (err) {
+            console.error('查询预约信息出错:', err);
+            return res.status(500).json({ error: '查询预约信息失败' });
+        }
+        if (results.length === 0) {
+            return res.json({ code: 1, msg: "当前没有预约，请先预约" });
+        }
+        const appt = results[0];
+
+        // 2. 判断预约日期是否为今天
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        if (appt.date > todayStr) {
+            return res.json({ code: 2, msg: "未到预约日期" });
+        } else if (appt.date < todayStr) {
+            return res.json({ code: 2, msg: "该预约已过期" });
+        }
+        // 3. 解析预约时段，判断是否处于预约时间内
+        const [startStr, endStr] = appt.time_slot.split('-').map(s => s.trim());
+        function parseHHMM(hhmm) {
+            const [hh, mm] = hhmm.split(':').map(x => parseInt(x, 10));
+            return hh * 60 + mm;
+        }
+        const startVal = parseHHMM(startStr);
+        const endVal = parseHHMM(endStr);
+        const nowVal = now.getHours() * 60 + now.getMinutes();
+        if (nowVal < startVal) {
+            return res.json({ code: 2, msg: "未到预约时间段" });
+        } else if (nowVal > endVal) {
+            return res.json({ code: 2, msg: "该预约时段已过" });
+        }
+        // 4. 检查医生聊天室状态
+        const chatSql = 'SELECT chat_status FROM users WHERE id = ? AND role = "心理医生"';
+        db.query(chatSql, [doctorId], (err2, results2) => {
+            if (err2) {
+                console.error('检查聊天室状态失败:', err2);
+                return res.status(500).json({ error: '检查聊天室状态失败' });
+            }
+            if (results2.length === 0) {
+                return res.status(404).json({ error: '医生未找到' });
+            }
+            const chatStatus = results2[0].chat_status;
+            if (chatStatus !== "open") {
+                return res.json({ code: 4, msg: "医生还未开放咨询" });
+            }
+            // 5. 检查当前聊天室中是否已有其他用户在咨询
+            if (activeChatrooms[doctorId] && activeChatrooms[doctorId] !== userId) {
+                // 有其他用户在咨询
+                return res.json({ code: 3, msg: "请等待医生叫号" });
+            }
+            // 如果没有其他用户或当前用户已经在咨询中，则允许进入
+            return res.json({ code: 0, msg: "可以进入咨询室" });
+        });
+    });
+});
+
 
 // 启动服务器
 const PORT = 3000;

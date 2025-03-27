@@ -85,16 +85,16 @@
                     container.innerHTML = '';  // 清空容器内容
                     data.forEach(article => {
                         const cardHTML = `
-                                    <div class="col-md-4">
-                                        <div class="card mb-4">
-                                        <img src="${article.image_url}" class="card-img-top" alt="文章封面">
-                                        <div class="card-body">
-                                            <h5 class="card-title">${article.title}</h5>
-                                            <a href="article.html?id=${article.id}" class="btn btn-primary">阅读全文</a>
-                                        </div>
-                                        </div>
-                                    </div>
-                                    `;
+                                                                <div class="col-md-4">
+                                                                  <div class="card mb-4">
+                                                                    <img src="${article.image_url}" class="card-img-top" alt="文章封面">
+                                                                    <div class="card-body">
+                                                                      <h5 class="card-title">${article.title}</h5>
+                                                                      <a href="article.html?id=${article.id}" class="btn btn-primary">阅读全文</a>
+                                                                    </div>
+                                                                  </div>
+                                                                </div>
+                                                              `;
                         container.insertAdjacentHTML('beforeend', cardHTML);
                     });
                 })
@@ -130,6 +130,24 @@
                     });
                 })
                 .catch(error => console.error('加载公告出错:', error));
+
+            document.addEventListener("DOMContentLoaded", function () {
+                // 获取用户角色
+                const role = localStorage.getItem('role');
+
+                // 获取心理咨询链接元素
+                const consultLink = document.getElementById('consultationLink');
+
+                // 根据角色设置链接
+                if (role === '心理医生') {
+                    consultLink.href = 'doctorDashboard.html';
+                    consultLink.textContent = '医生工作台';
+                } else {
+                    consultLink.href = 'doctorList.html';
+                    consultLink.textContent = '心理咨询';
+                }
+            });
+
         </script>
     </main>
     <!-- 修改密码模态框 -->
@@ -166,7 +184,6 @@
             </div>
         </div>
     </div>
-
     <!-- 页脚放在 main 之外 -->
     <footer class="bg-primary text-white text-center py-3">
         <div class="container">
@@ -203,7 +220,47 @@
             localStorage.removeItem('username');
             window.location.href = 'login.html';
         });
+    </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            // 获取今天的日期字符串 (YYYY-MM-DD)
+            const today = new Date().toISOString().slice(0, 10);
+            // 从 localStorage 获取用户是否选择了今日不再显示公告
+            const hideAnnouncement = localStorage.getItem("hideAnnouncementDate");
 
+            // 如果用户已选择不显示且标记为今天，则不显示弹窗
+            if (hideAnnouncement === today) {
+                return;
+            }
+
+            // 调用后端接口获取公告数据（假设返回的是数组）
+            fetch("/api/announcements")
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length > 0) {
+                        // 选择最新的一条公告（也可以根据需要选择其它逻辑）
+                        const announcement = data[0];
+                        // 填充公告内容到模态框
+                        document.getElementById("announcementContent").innerHTML = `
+                                    <h4>${announcement.title}</h4>
+                                    <p>${announcement.content}</p>
+                                    <small>发布时间：${new Date(announcement.created_at).toLocaleString()}</small>
+                                  `;
+                        // 使用 jQuery 显示模态框（Bootstrap 4 依赖 jQuery）
+                        $("#announcementModal").modal("show");
+                    }
+                })
+                .catch(error => {
+                    console.error("加载公告失败:", error);
+                });
+
+            // 绑定“不再显示”按钮事件
+            document.getElementById("hideAnnouncementBtn").addEventListener("click", function () {
+                // 将今天的日期保存到 localStorage 中，表示今日不再显示公告
+                localStorage.setItem("hideAnnouncementDate", today);
+                $("#announcementModal").modal("hide");
+            });
+        });
         // 修改密码功能
         document.getElementById("changePwdBtn").addEventListener("click", function (e) {
             e.preventDefault();
@@ -267,7 +324,6 @@
                 msgDiv.textContent = msg;
             }
         }
-
     </script>
 
     <!-- 公告弹窗模态框 -->

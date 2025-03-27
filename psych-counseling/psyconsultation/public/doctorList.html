@@ -63,71 +63,80 @@
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        // 权限检查：确保只有普通用户才能访问 doctorList.html
+        // 权限检查
         if (localStorage.getItem("role") !== "普通用户") {
             alert("您没有权限访问此页面！这是普通用户的页面");
             window.location.href = "index.html";
         }
 
-        // 绑定所有“立即咨询”按钮的点击事件
         function bindConsultButtons() {
             document.querySelectorAll('.consultBtn').forEach(btn => {
                 btn.addEventListener('click', async function (e) {
                     e.preventDefault();
                     const doctorId = btn.getAttribute('data-doctorid');
+                    const userId = localStorage.getItem('userId');
+                    if (!userId) {
+                        alert("未登录或无法获取用户ID！");
+                        window.location.href = "login.html";
+                        return;
+                    }
                     try {
-                        const res = await fetch(`/api/checkChatStatus?doctorId=${doctorId}`);
+                        const res = await fetch(`/api/joinChat`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ userId, doctorId })
+                        });
                         const data = await res.json();
                         if (res.ok) {
-                            if (data.chatStatus === "open") {
-                                // 聊天室已开启，跳转到聊天室
+                            if (data.code === 0) {
+                                // 允许进入咨询室
                                 window.location.href = `chat.html?doctorId=${doctorId}`;
+                            } else if (data.code === 3) {
+                                alert(data.msg || "请等待医生叫号");
                             } else {
-                                alert("医生还未开放咨询，请稍后再试或预约后再进入咨询室！");
+                                alert("未知状态，无法进入咨询室");
                             }
                         } else {
-                            alert("检查聊天室状态失败：" + (data.error || "未知错误"));
+                            alert("检查咨询流程失败：" + (data.error || "未知错误"));
                         }
                     } catch (error) {
-                        console.error("检查聊天室状态出错：", error);
-                        alert("检查聊天室状态时出错");
+                        console.error("检查咨询流程时出错:", error);
+                        alert("网络或服务器错误，无法进行咨询");
                     }
                 });
             });
         }
 
-        // 页面加载后调用后端接口获取医生信息
+        // 动态加载医生信息后，绑定事件
         document.addEventListener("DOMContentLoaded", function () {
             fetch('/api/doctors')
-                .then(response => response.json())
+                .then(res => res.json())
                 .then(data => {
                     const doctorList = document.getElementById('doctorList');
-                    doctorList.innerHTML = '';  // 清空容器
+                    doctorList.innerHTML = '';
                     data.forEach(doctor => {
-                        // 构建医生卡片 HTML
                         const cardHTML = `
-                  <div class="col-md-4 doctor-card">
-                    <div class="card">
-                      <div class="card-body">
-                        <h5 class="card-title">${doctor.username}</h5>
-                        <p class="card-text">
-                          <strong>职称：</strong> ${doctor.title || '暂无'}<br>
-                          <strong>擅长：</strong> ${doctor.expertise || '暂无'}<br>
-                          <strong>从业时间：</strong> ${doctor.working_years || '未知'} 年<br>
-                          <strong>评价数量：</strong> ${doctor.review_count || 0}
-                        </p>
-                        <a href="chat.html?doctorId=${doctor.id}" class="btn btn-primary consultBtn" data-doctorid="${doctor.id}">立即咨询</a>
-                        <a href="appointment.html?doctorId=${doctor.id}" class="btn btn-secondary">预约</a>
-                      </div>
-                    </div>
-                  </div>
-                `;
+            <div class="col-md-4 doctor-card">
+              <div class="card">
+                <div class="card-body">
+                  <h5 class="card-title">${doctor.username}</h5>
+                  <p class="card-text">
+                    <strong>职称：</strong> ${doctor.title || '暂无'}<br>
+                    <strong>擅长：</strong> ${doctor.expertise || '暂无'}<br>
+                    <strong>从业时间：</strong> ${doctor.working_years || '未知'} 年<br>
+                    <strong>评价数量：</strong> ${doctor.review_count || 0}
+                  </p>
+                  <a href="#" class="btn btn-primary consultBtn" data-doctorid="${doctor.id}">立即咨询</a>
+                  <a href="appointment.html?doctorId=${doctor.id}" class="btn btn-secondary">预约</a>
+                </div>
+              </div>
+            </div>
+          `;
                         doctorList.insertAdjacentHTML('beforeend', cardHTML);
                     });
-                    // 动态生成医生卡片后绑定“立即咨询”按钮事件
                     bindConsultButtons();
                 })
-                .catch(error => console.error('加载医生信息出错:', error));
+                .catch(err => console.error('加载医生信息出错:', err));
         });
         
 

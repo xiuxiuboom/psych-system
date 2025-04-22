@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>审核心理医生申请 - 心理咨询中心</title>
+    <!-- Bootswatch Cosmo 主题 -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootswatch/4.5.2/cosmo/bootstrap.min.css" />
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+    <!-- 导航栏（同 index.html） -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <a class="navbar-brand" href="index.html">心理咨询中心</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarContent"
+                aria-controls="navbarContent" aria-expanded="false" aria-label="切换导航">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarContent">
+            <ul class="navbar-nav mr-auto">
+                <li class="nav-item"><a class="nav-link" href="index.html">首页</a></li>
+                <li class="nav-item"><a class="nav-link" href="articles.html">文章</a></li>
+                <li class="nav-item"><a class="nav-link" href="messageWall.html">留言墙</a></li>
+                <li class="nav-item"><a class="nav-link" href="doctorList.html">心理咨询</a></li>
+            </ul>
+            <ul class="navbar-nav ml-auto">
+                <li class="nav-item" id="userInfo"></li>
+                <li class="nav-item"><a class="nav-link" href="#" id="logoutBtn">退出登录</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- 主体内容 -->
+    <main class="container my-5">
+        <h2 class="text-center mb-4">审核心理医生申请</h2>
+        <div class="table-responsive">
+            <table class="table table-bordered">
+                <thead class="thead-light">
+                    <tr>
+                        <th>申请ID</th>
+                        <th>用户名</th>
+                        <th>真实姓名</th>
+                        <th>证书编号</th>
+                        <th>领域 / 年限</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="apps"></tbody>
+            </table>
+        </div>
+    </main>
+
+    <!-- 页脚（同 index.html） -->
+    <footer class="bg-primary text-white text-center py-3">
+        <div class="container">
+            <p class="mb-0">&copy; 2025 心理咨询中心. 版权所有.</p>
+        </div>
+    </footer>
+
+    <!-- JS 库 -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // 登录检查 & 显示用户名
+        if (!localStorage.getItem('isAdmin')) {
+            window.location.href = 'adminLogin.html';
+        }
+        document.getElementById('userInfo').innerHTML =
+            `<span class="navbar-text">欢迎, ${localStorage.getItem('username')}</span>`;
+
+        // 退出登录
+        document.getElementById('logoutBtn').addEventListener('click', e => {
+            e.preventDefault();
+            localStorage.clear();
+            window.location.href = 'adminLogin.html';
+        });
+
+        // 加载申请列表
+        async function loadApps() {
+            try {
+                const apps = await (await fetch('/api/doctorApplications')).json();
+                const tb = document.getElementById('apps');
+                tb.innerHTML = '';
+                apps.forEach(a => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                <td>${a.id}</td>
+                <td>${a.username}</td>
+                <td>${a.real_name}</td>
+                <td>${a.certificate_number}</td>
+                <td>${a.expertise} / ${a.working_years} 年</td>
+                <td>
+                  <button class="btn btn-sm btn-success mr-1" onclick="review(${a.id}, true)">通过</button>
+                  <button class="btn btn-sm btn-danger" onclick="review(${a.id}, false)">拒绝</button>
+                </td>
+              `;
+                    tb.appendChild(row);
+                });
+            } catch (err) {
+                console.error('加载申请列表失败', err);
+            }
+        }
+
+        // 审核操作
+        async function review(id, ok) {
+            try {
+                const url = `/api/doctorApplications/${id}/${ok ? 'approve' : 'reject'}`;
+                const res = await fetch(url, { method: 'POST' });
+                if (res.ok) {
+                    loadApps();
+                } else {
+                    alert('操作失败');
+                }
+            } catch (err) {
+                console.error('审核出错', err);
+                alert('网络或服务器错误');
+            }
+        }
+
+        // 初次加载
+        loadApps();
+    </script>
+</body>
+
+</html>

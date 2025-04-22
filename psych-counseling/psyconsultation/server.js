@@ -152,16 +152,18 @@ app.post('/api/changePassword', (req, res) => {
     });
 });
 
-app.get('/api/quotes', (req, res) => {
-    db.query('SELECT * FROM quotes ORDER BY created_at DESC', (err, results) => {
-        if (err) {
-            console.error('查询心理语录列表错误:', err);
-            return res.status(500).json({ error: '无法获取心理语录列表' });
-        }
-        res.json(results);
-    });
-});
+//获取心理语录列表
+//app.get('/api/quotes', (req, res) => {
+//    db.query('SELECT * FROM quotes ORDER BY created_at DESC', (err, results) => {
+//        if (err) {
+//            console.error('查询心理语录列表错误:', err);
+//            return res.status(500).json({ error: '无法获取心理语录列表' });
+//        }
+//        res.json(results);
+//    });
+//});
 
+//获取心理语录列表
 app.get('/api/quote', (req, res) => {
     if (req.query.id) {
         // 如果传入 id 参数，则查询对应语录的完整记录
@@ -311,6 +313,7 @@ app.get('/api/users', (req, res) => {
     });
 });
 
+//修改用户身份
 app.put('/api/user', (req, res) => {
     const { id, role } = req.body;
     // 验证 role 合法性
@@ -325,6 +328,61 @@ app.put('/api/user', (req, res) => {
         res.json({ success: true });
     });
 });
+
+//提交成为心理咨询医生申请
+app.post('/api/doctorApplications', (req, res) => {
+    const { userId, realName, idCard, phone, certificateNumber, expertise, workingYears } = req.body;
+    if (!userId || !realName || !idCard || !phone || !certificateNumber || !expertise || !workingYears) {
+        return res.status(400).json({ error: '缺少必填参数' });
+    }
+    const sql = `INSERT INTO doctor_applications 
+    (user_id, real_name, id_card, phone, certificate_number, expertise, working_years)
+    VALUES (?,?,?,?,?,?,?)`;
+    db.query(sql, [userId, realName, idCard, phone, certificateNumber, expertise, workingYears], (err) => {
+        if (err) return res.status(500).json({ error: '保存申请失败' });
+        res.json({ success: true, msg: '提交申请成功，请耐心等待审核。' });
+    });
+});
+
+//管理员查待审列表
+app.get('/api/doctorApplications', (req, res) => {
+    db.query(`SELECT a.*, u.username, u.email 
+            FROM doctor_applications a 
+            JOIN users u ON a.user_id = u.id 
+            WHERE a.status = 'pending'`, (err, results) => {
+        if (err) return res.status(500).json({ error: '查询申请失败' });
+        res.json(results);
+    });
+});
+
+//审核通过
+app.post('/api/doctorApplications/:id/approve', (req, res) => {
+    const appId = req.params.id;
+    // 先查出这条申请对应的 user_id
+    db.query('SELECT user_id FROM doctor_applications WHERE id = ?', [appId], (err, rows) => {
+        if (err || !rows.length) return res.status(404).json({ error: '申请未找到' });
+        const uid = rows[0].user_id;
+        // 更新申请状态
+        db.query('UPDATE doctor_applications SET status="approved" WHERE id=?', [appId], err2 => {
+            if (err2) return res.status(500).json({ error: '更新申请状态失败' });
+            // 把 users 表中的 role 改为 心理医生
+            db.query('UPDATE users SET role="心理医生" WHERE id=?', [uid], err3 => {
+                if (err3) return res.status(500).json({ error: '更新用户身份失败' });
+                res.json({ success: true });
+            });
+        });
+    });
+});
+
+//审核不通过
+app.post('/api/doctorApplications/:id/reject', (req, res) => {
+    const appId = req.params.id;
+    db.query('UPDATE doctor_applications SET status="rejected" WHERE id=?', [appId], (err) => {
+        if (err) return res.status(500).json({ error: '更新申请状态失败' });
+        res.json({ success: true });
+    });
+});
+
 
 // 管理员登录接口
 app.post('/api/admin/login', (req, res) => {
@@ -447,7 +505,7 @@ app.delete('/api/article', (req, res) => {
     });
 });
 
-
+//获取公告
 app.get('/api/announcements', (req, res) => {
     db.query('SELECT * FROM announcements ORDER BY created_at DESC', (err, results) => {
         if (err) {
@@ -458,19 +516,19 @@ app.get('/api/announcements', (req, res) => {
     });
 });
 
-app.get('/api/announcement', (req, res) => {
-    const id = parseInt(req.query.id);
-    db.query('SELECT * FROM announcements WHERE id = ?', [id], (err, results) => {
-        if (err) {
-            console.error('查询公告详情错误:', err);
-            return res.status(500).json({ error: '查询公告失败' });
-        }
-        if (results.length === 0) {
-            return res.status(404).json({ error: '公告未找到' });
-        }
-        res.json(results[0]);
-    });
-});
+//app.get('/api/announcement', (req, res) => {
+//    const id = parseInt(req.query.id);
+//    db.query('SELECT * FROM announcements WHERE id = ?', [id], (err, results) => {
+//        if (err) {
+//            console.error('查询公告详情错误:', err);
+//            return res.status(500).json({ error: '查询公告失败' });
+//        }
+//        if (results.length === 0) {
+//            return res.status(404).json({ error: '公告未找到' });
+//        }
+//        res.json(results[0]);
+//    });
+//});
 
 // 医生开放聊天室接口
 // 请求体应包含 { doctorId: "4" }
@@ -566,7 +624,6 @@ app.post('/api/leaveChat', (req, res) => {
 });
 
 
-
 // 获取所有医生信息（从 users 表中筛选角色为“心理医生”的记录）
 app.get('/api/doctors', (req, res) => {
     if (req.query.id) {
@@ -593,7 +650,7 @@ app.get('/api/doctors', (req, res) => {
     }
 });
 
-
+//预约
 app.post('/api/appointments', (req, res) => {
     const { userId, doctorId, date, timeSlot, profile } = req.body;
 
@@ -888,6 +945,7 @@ app.post('/api/openChat', (req, res) => {
     return res.json({ success: true });
 });
 
+//医生关闭聊天室
 app.post('/api/closeChat', (req, res) => {
     const { doctorId } = req.body;
     if (!doctorId) {

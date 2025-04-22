@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>申请成为心理医生</title>
+    <!-- 引入 Bootswatch Cosmo 主题 -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootswatch/4.5.2/cosmo/bootstrap.min.css" />
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+    <!-- 顶部导航栏，与其他页面保持一致 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <a class="navbar-brand" href="index.html">心理咨询中心</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarContent"
+                aria-controls="navbarContent" aria-expanded="false" aria-label="切换导航">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarContent">
+            <ul class="navbar-nav mr-auto">
+                <li class="nav-item"><a class="nav-link" href="index.html">首页</a></li>
+                <li class="nav-item"><a class="nav-link" href="articles.html">文章</a></li>
+                <li class="nav-item"><a class="nav-link" href="messageWall.html">留言墙</a></li>
+                <li class="nav-item"><a class="nav-link" href="doctorList.html">心理咨询</a></li>
+            </ul>
+            <ul class="navbar-nav ml-auto">
+                <li class="nav-item" id="userInfo"></li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" id="logoutBtn">退出登录</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- 主体内容 -->
+    <main class="container my-5">
+        <h2 class="text-center mb-4">申请成为心理医生</h2>
+        <form id="applyForm" class="mx-auto" style="max-width: 600px;">
+            <div class="form-group">
+                <label for="realName">真实姓名</label>
+                <input type="text" class="form-control" id="realName" required>
+            </div>
+            <div class="form-group">
+                <label for="idCard">身份证号</label>
+                <input type="text" class="form-control" id="idCard" placeholder="请输入身份证号" required>
+            </div>
+            <div class="form-group">
+                <label for="phone">联系方式（手机号）</label>
+                <input type="tel" class="form-control" id="phone" placeholder="例如：138xxxx1234" required>
+            </div>
+            <div class="form-group">
+                <label for="certificateNumber">资格证书编号</label>
+                <input type="text" class="form-control" id="certificateNumber" placeholder="心理咨询师证书编号" required>
+            </div>
+            <div class="form-group">
+                <label for="expertise">擅长领域</label>
+                <input type="text" class="form-control" id="expertise" placeholder="例如：焦虑、抑郁、婚姻关系等" required>
+            </div>
+            <div class="form-group">
+                <label for="workingYears">从业年限（年）</label>
+                <input type="number" class="form-control" id="workingYears" min="0" placeholder="请输入从业年限" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">提交申请</button>
+            <div id="submitMsg" class="alert mt-3" style="display:none;"></div>
+        </form>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-primary text-white text-center py-3">
+        <div class="container">
+            <p class="mb-0">&copy; 2025 心理咨询中心. 版权所有.</p>
+        </div>
+    </footer>
+
+    <!-- 引入脚本库 -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+
+    <!-- 逻辑脚本 -->
+    <script>
+        // 登录校验并显示用户名
+        if (!localStorage.getItem("isLoggedIn")) {
+            window.location.href = "login.html";
+        }
+        const username = localStorage.getItem("username");
+        document.getElementById("userInfo").innerHTML = `<span class="navbar-text">欢迎, ${username}</span>`;
+
+        // 退出登录
+        document.getElementById("logoutBtn").addEventListener("click", function (e) {
+            e.preventDefault();
+            localStorage.clear();
+            window.location.href = "login.html";
+        });
+
+        // 监听提交
+        document.getElementById("applyForm").addEventListener("submit", async function (e) {
+            e.preventDefault();
+
+            const userId = localStorage.getItem("userId");
+            const payload = {
+                userId,
+                realName: document.getElementById("realName").value.trim(),
+                idCard: document.getElementById("idCard").value.trim(),
+                phone: document.getElementById("phone").value.trim(),
+                certificateNumber: document.getElementById("certificateNumber").value.trim(),
+                expertise: document.getElementById("expertise").value.trim(),
+                workingYears: parseInt(document.getElementById("workingYears").value.trim(), 10)
+            };
+
+            const msgDiv = document.getElementById("submitMsg");
+            msgDiv.style.display = "none";
+
+            // 简单校验
+            if (!payload.realName || !payload.idCard || !payload.phone ||
+                !payload.certificateNumber || !payload.expertise ||
+                isNaN(payload.workingYears)) {
+                msgDiv.className = "alert alert-danger";
+                msgDiv.textContent = "请填写完整且格式正确的信息";
+                msgDiv.style.display = "block";
+                return;
+            }
+
+            try {
+                const res = await fetch("/api/doctorApplications", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                const result = await res.json();
+                msgDiv.style.display = "block";
+                if (res.ok && result.success) {
+                    msgDiv.className = "alert alert-success";
+                    msgDiv.textContent = result.msg || "申请提交成功，请耐心等待审核。";
+                } else {
+                    msgDiv.className = "alert alert-danger";
+                    msgDiv.textContent = "申请失败：" + (result.error || "服务器错误");
+                }
+            } catch (error) {
+                console.error("提交失败：", error);
+                msgDiv.className = "alert alert-danger";
+                msgDiv.textContent = "网络或服务器异常";
+                msgDiv.style.display = "block";
+            }
+        });
+    </script>
+</body>
+
+</html>

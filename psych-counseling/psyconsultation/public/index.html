@@ -32,6 +32,9 @@
                 <li class="nav-item">
                     <a class="nav-link" href="#" id="consultationLink">心理咨询</a>
                 </li>
+                <li class="nav-item" id="applyDoctorNav" style="display: none;">
+                    <a class="nav-link" href="applyDoctor.html">申请成为心理医生</a>
+                </li>
             </ul>
             <!-- 用户信息区域 -->
             <ul class="navbar-nav ml-auto">
@@ -132,13 +135,15 @@
                 .catch(error => console.error('加载公告出错:', error));
 
             document.addEventListener("DOMContentLoaded", function () {
-                // 获取用户角色
+                // 先做申请按钮的显示/隐藏
                 const role = localStorage.getItem('role');
+                const applyLi = document.getElementById('applyDoctorNav');
+                if (role === '普通用户') {
+                    applyLi.style.display = 'block';
+                }
 
-                // 获取心理咨询链接元素
+                // 原有的“心理咨询”那段代码
                 const consultLink = document.getElementById('consultationLink');
-
-                // 根据角色设置链接
                 if (role === '心理医生') {
                     consultLink.href = 'doctorDashboard.html';
                     consultLink.textContent = '医生工作台';

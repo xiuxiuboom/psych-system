@@ -73,36 +73,59 @@
             document.querySelectorAll('.consultBtn').forEach(btn => {
                 btn.addEventListener('click', async function (e) {
                     e.preventDefault();
-                    const doctorId = btn.getAttribute('data-doctorid');
+                    const doctorId = btn.dataset.doctorid;
                     const userId = localStorage.getItem('userId');
                     if (!userId) {
                         alert("未登录或无法获取用户ID！");
-                        window.location.href = "login.html";
-                        return;
+                        return window.location.href = "login.html";
                     }
+
+                    // —— 第一步：检查预约流程
                     try {
-                        const res = await fetch(`/api/joinChat`, {
+                        const checkRes = await fetch(
+                            `/api/checkConsultFlow?userId=${userId}&doctorId=${doctorId}`
+                        );
+                        const checkData = await checkRes.json();
+                        if (!checkRes.ok) {
+                            throw new Error(checkData.error || "流程检查失败");
+                        }
+                        switch (checkData.code) {
+                            case 1:
+                                return alert("当前没有预约，请先预约");
+                            case 2:
+                                return alert(checkData.msg || "未到预约时间段");
+                            case 3:
+                                return alert("请等待医生叫号");
+                            case 4:
+                                return alert("医生还未开放咨询");
+                            // code 0 允许进入
+                        }
+                    } catch (err) {
+                        console.error("检查流程出错:", err);
+                        return alert("网络或服务器错误，无法进行咨询");
+                    }
+
+                    // —— 第二步：登记进入聊天室
+                    try {
+                        const joinRes = await fetch('/api/joinChat', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ userId, doctorId })
                         });
-                        const data = await res.json();
-                        if (res.ok) {
-                            if (data.code === 0) {
-                                // 允许进入咨询室
-                                window.location.href = `chat.html?doctorId=${doctorId}`;
-                            } else if (data.code === 3) {
-                                alert(data.msg || "请等待医生叫号");
-                            } else {
-                                alert("未知状态，无法进入咨询室");
-                            }
-                        } else {
-                            alert("检查咨询流程失败：" + (data.error || "未知错误"));
+                        const joinData = await joinRes.json();
+                        if (!joinRes.ok) {
+                            throw new Error(joinData.error || "加入聊天室失败");
                         }
-                    } catch (error) {
-                        console.error("检查咨询流程时出错:", error);
-                        alert("网络或服务器错误，无法进行咨询");
+                        if (joinData.code !== 0) {
+                            return alert(joinData.msg || "请等待医生叫号");
+                        }
+                    } catch (err) {
+                        console.error("加入聊天室出错:", err);
+                        return alert("网络或服务器错误，无法加入咨询室");
                     }
+
+                    // —— 第三步：跳转到 chat.html
+                    window.location.href = `chat.html?doctorId=${doctorId}`;
                 });
             });
         }

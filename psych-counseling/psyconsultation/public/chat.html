@@ -272,7 +272,7 @@
                     if (res.ok && result.success) {
                         const sysMsg = JSON.stringify({
                             type: "system",
-                            content: "医生已退出咨询室",
+                            content: "医生已退出咨询室，医生将无法看到后续发送的消息",
                             timestamp: new Date().toISOString()
                         });
                         if (ws.readyState === WebSocket.OPEN) {

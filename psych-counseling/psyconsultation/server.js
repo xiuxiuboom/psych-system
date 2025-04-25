@@ -530,6 +530,84 @@ app.get('/api/announcements', (req, res) => {
 //    });
 //});
 
+
+// 提交评价
+//app.post('/api/reviews', (req, res) => {
+//    const { userId, doctorId, appointmentId, content, rating } = req.body;
+//    if (!userId || !doctorId || !content || typeof rating !== 'number') {
+//        return res.status(400).json({ error: '缺少必填字段' });
+//    }
+
+//    // 1. 插入 reviews 表
+//    const insertSql = `
+//    INSERT INTO reviews (user_id, doctor_id, appointment_id, content, rating)
+//    VALUES (?, ?, ?, ?, ?)
+//  `;
+//    db.query(
+//        insertSql,
+//        [userId, doctorId, appointmentId, content, rating],
+//        (err, result) => {
+//            if (err) {
+//                console.error('插入评价失败:', err);
+//                return res.status(500).json({ error: '插入评价失败' });
+//            }
+
+//            // 2. 评价插入成功后，给 users.review_count +1
+//            const updateSql = `
+//                SELECT u.id, u.username, u.title, u.expertise, u.working_years,
+//                COUNT(r.id) AS review_count
+//                FROM users u
+//                LEFT JOIN reviews r ON u.id = r.doctor_id
+//                WHERE u.role = '心理医生'
+//                GROUP BY u.id
+//            `;
+//            db.query(updateSql, [doctorId], (err2) => {
+//                if (err2) {
+//                    console.error('更新医生评价数失败:', err2);
+//                    // 评价已经写入，可以还是返回 success，让前端继续
+//                    return res.json({ success: true });
+//                }
+//                // 全部成功
+//                res.json({ success: true });
+//            });
+//        }
+//    );
+//});
+
+app.post('/api/reviews', (req, res) => {
+    const { userId, doctorId, appointmentId } = req.body;
+    const rating = parseInt(req.body.rating, 10);
+    // content 允许为空
+    const content = req.body.content ? req.body.content.trim() : '';
+
+    // 只校验 userId, doctorId, rating
+    if (!userId || !doctorId || isNaN(rating) || rating < 1 || rating > 10) {
+        return res.status(400).json({ error: '缺少必填字段或评分格式错误' });
+    }
+
+    const insertSql = `
+    INSERT INTO reviews (user_id, doctor_id, appointment_id, content, rating)
+    VALUES (?, ?, ?, ?, ?)
+  `;
+    db.query(insertSql, [userId, doctorId, appointmentId, content, rating], (err) => {
+        if (err) {
+            console.error('插入评价失败:', err);
+            return res.status(500).json({ error: '插入评价失败' });
+        }
+        // 插入成功后自增 review_count
+        const updateSql = `
+      UPDATE users
+      SET review_count = review_count + 1
+      WHERE id = ?
+    `;
+        db.query(updateSql, [doctorId], (err2) => {
+            if (err2) console.error('更新医生评价数失败:', err2);
+            // 不论更新成功与否，都返回 success
+            res.json({ success: true });
+        });
+    });
+});
+
 // 医生开放聊天室接口
 // 请求体应包含 { doctorId: "4" }
 // 医生开启聊天室接口

@@ -113,6 +113,32 @@
         <div class="text-right">
             <button id="exitButton" class="btn btn-secondary">退出聊天</button>
         </div>
+        <!-- 2222222222222222 -->
+        <div class="modal fade" id="reviewModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <form id="reviewForm" class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">请为本次咨询服务打分并评价</h5>
+                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="reviewRating">评分（1~10）</label>
+                            <input type="number" id="reviewRating" class="form-control" min="1" max="10" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="reviewContent">文字评价（可选）</label>
+                            <textarea id="reviewContent" class="form-control" rows="3"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" id="skipReview" class="btn btn-secondary" data-dismiss="modal">跳过</button>
+                        <button type="submit" class="btn btn-primary">提交评价</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- 2222222222222222 -->
     </div>
 
     <!-- 页脚 -->
@@ -245,23 +271,55 @@
             input.value = "";
         };
 
+        //document.getElementById("exitButton").onclick = async () => {
+        //    const role = localStorage.getItem("role");
+        //    if (role !== "心理医生") {
+        //        const userId = localStorage.getItem("userId");
+        //        try {
+        //            await fetch('/api/leaveChat', {
+        //                method: 'POST',
+        //                headers: { 'Content-Type': 'application/json' },
+        //                body: JSON.stringify({ doctorId, userId })
+        //            });
+        //        } catch (err) {
+        //            console.error("调用 leaveChat 接口出错：", err);
+        //        }
+        //        ws.close();
+        //        window.location.href = "doctorList.html";
+        //    } else {
+        //        // 医生端退出调用关闭聊天室接口
+        //        try {
+        //            const res = await fetch('/api/closeChat', {
+        //                method: 'POST',
+        //                headers: { 'Content-Type': 'application/json' },
+        //                body: JSON.stringify({ doctorId: localStorage.getItem("userId") })
+        //            });
+        //            const result = await res.json();
+        //            if (res.ok && result.success) {
+        //                const sysMsg = JSON.stringify({
+        //                    type: "system",
+        //                    content: "医生已退出咨询室，医生将无法看到后续发送的消息",
+        //                    timestamp: new Date().toISOString()
+        //                });
+        //                if (ws.readyState === WebSocket.OPEN) {
+        //                    ws.send(sysMsg);
+        //                }
+        //            } else {
+        //                alert("关闭聊天室失败：" + (result.error || "未知错误"));
+        //            }
+        //        } catch (error) {
+        //            console.error("调用关闭聊天室接口出错：", error);
+        //            alert("调用关闭聊天室接口出错");
+        //        }
+        //        ws.close();
+        //        window.location.href = "doctorDashboard.html";
+        //    }
+        //};
+        // 退出聊天按钮改为：普通用户先离开聊天室，再弹评价弹窗；医生直接关闭并跳回工作台
         document.getElementById("exitButton").onclick = async () => {
             const role = localStorage.getItem("role");
-            if (role !== "心理医生") {
-                const userId = localStorage.getItem("userId");
-                try {
-                    await fetch('/api/leaveChat', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ doctorId, userId })
-                    });
-                } catch (err) {
-                    console.error("调用 leaveChat 接口出错：", err);
-                }
-                ws.close();
-                window.location.href = "doctorList.html";
-            } else {
-                // 医生端退出调用关闭聊天室接口
+            // 心理医生退出
+            if (role === "心理医生") {
                 try {
                     const res = await fetch('/api/closeChat', {
                         method: 'POST',
@@ -275,20 +333,75 @@
                             content: "医生已退出咨询室，医生将无法看到后续发送的消息",
                             timestamp: new Date().toISOString()
                         });
-                        if (ws.readyState === WebSocket.OPEN) {
-                            ws.send(sysMsg);
-                        }
+                        if (ws.readyState === WebSocket.OPEN) ws.send(sysMsg);
                     } else {
                         alert("关闭聊天室失败：" + (result.error || "未知错误"));
                     }
-                } catch (error) {
-                    console.error("调用关闭聊天室接口出错：", error);
-                    alert("调用关闭聊天室接口出错");
+                } catch (err) {
+                    console.error("调用 closeChat 接口出错：", err);
+                    alert("网络或服务器错误");
                 }
                 ws.close();
-                window.location.href = "doctorDashboard.html";
+                return window.location.href = "doctorDashboard.html";
             }
+
+            // 普通用户退出——先调用离开接口
+            const userId = localStorage.getItem("userId");
+            try {
+                await fetch('/api/leaveChat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ doctorId, userId })
+                });
+            } catch (err) {
+                console.error("调用 leaveChat 接口出错：", err);
+            }
+            ws.close();
+
+            // **弹评价弹窗**（Bootstrap Modal）
+            $('#reviewModal').modal('show');
         };
+
+        // “跳过评价”按钮：直接关弹窗，回到医生列表
+        document.getElementById('skipReview').onclick = () => {
+            $('#reviewModal').modal('hide');
+            window.location.href = 'doctorList.html';
+        };
+
+        // 提交评价表单
+        document.getElementById('reviewForm').addEventListener('submit', async e => {
+            e.preventDefault();
+
+            const userId = localStorage.getItem('userId');
+            const rating = parseInt(document.getElementById('reviewRating').value, 10);
+            const content = document.getElementById('reviewContent').value.trim();
+
+            try {
+                const res = await fetch('/api/reviews', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId,
+                        doctorId,       // URL 参数里已经拿到
+                        appointmentId: null, // 如有预约ID就传过来
+                        rating,
+                        content
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    throw new Error(data.error || '提交失败');
+                }
+                alert('感谢您的评价！');
+            } catch (err) {
+                console.error('评价提交失败：', err);
+                alert('网络或服务器异常，评价未提交');
+            }
+
+            $('#reviewModal').modal('hide');
+            window.location.href = 'doctorList.html';
+        });
+
     </script>
 </body>
 </html>

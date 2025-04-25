@@ -152,16 +152,6 @@ app.post('/api/changePassword', (req, res) => {
     });
 });
 
-//获取心理语录列表
-//app.get('/api/quotes', (req, res) => {
-//    db.query('SELECT * FROM quotes ORDER BY created_at DESC', (err, results) => {
-//        if (err) {
-//            console.error('查询心理语录列表错误:', err);
-//            return res.status(500).json({ error: '无法获取心理语录列表' });
-//        }
-//        res.json(results);
-//    });
-//});
 
 //获取心理语录列表
 app.get('/api/quote', (req, res) => {
@@ -505,75 +495,64 @@ app.delete('/api/article', (req, res) => {
     });
 });
 
-//获取公告
+// 1. 查询所有公告
 app.get('/api/announcements', (req, res) => {
-    db.query('SELECT * FROM announcements ORDER BY created_at DESC', (err, results) => {
-        if (err) {
-            console.error('查询公告列表错误:', err);
-            return res.status(500).json({ error: '无法获取公告列表' });
+    db.query(
+        'SELECT id, title, content, created_at, updated_at FROM announcements ORDER BY created_at DESC',
+        (err, results) => {
+            if (err) return res.status(500).json({ error: '无法获取公告列表' });
+            res.json(results);
         }
-        res.json(results);
+    );
+});
+// 新增公告
+app.post('/api/announcements', (req, res) => {
+    const { title, content } = req.body;
+    if (!title || !content) {
+        return res.status(400).json({ error: '缺少标题或内容' });
+    }
+    const sql = 'INSERT INTO announcements (title, content) VALUES (?, ?)';
+    db.query(sql, [title, content], (err, result) => {
+        if (err) {
+            console.error('新增公告失败:', err);
+            return res.status(500).json({ error: '新增公告失败' });
+        }
+        res.json({ success: true, id: result.insertId });
     });
 });
 
-//app.get('/api/announcement', (req, res) => {
-//    const id = parseInt(req.query.id);
-//    db.query('SELECT * FROM announcements WHERE id = ?', [id], (err, results) => {
-//        if (err) {
-//            console.error('查询公告详情错误:', err);
-//            return res.status(500).json({ error: '查询公告失败' });
-//        }
-//        if (results.length === 0) {
-//            return res.status(404).json({ error: '公告未找到' });
-//        }
-//        res.json(results[0]);
-//    });
-//});
+// 更新公告
+app.put('/api/announcements/:id', (req, res) => {
+    const id = req.params.id;
+    const { title, content } = req.body;
+    if (!title || !content) {
+        return res.status(400).json({ error: '缺少标题或内容' });
+    }
+    const sql = 'UPDATE announcements SET title=?, content=? WHERE id=?';
+    db.query(sql, [title, content, id], err => {
+        if (err) {
+            console.error('更新公告失败:', err);
+            return res.status(500).json({ error: '更新公告失败' });
+        }
+        res.json({ success: true });
+    });
+});
+
+// 删除公告
+app.delete('/api/announcements/:id', (req, res) => {
+    const id = req.params.id;
+    const sql = 'DELETE FROM announcements WHERE id = ?';
+    db.query(sql, [id], err => {
+        if (err) {
+            console.error('删除公告失败:', err);
+            return res.status(500).json({ error: '删除公告失败' });
+        }
+        res.json({ success: true });
+    });
+});
 
 
-// 提交评价
-//app.post('/api/reviews', (req, res) => {
-//    const { userId, doctorId, appointmentId, content, rating } = req.body;
-//    if (!userId || !doctorId || !content || typeof rating !== 'number') {
-//        return res.status(400).json({ error: '缺少必填字段' });
-//    }
-
-//    // 1. 插入 reviews 表
-//    const insertSql = `
-//    INSERT INTO reviews (user_id, doctor_id, appointment_id, content, rating)
-//    VALUES (?, ?, ?, ?, ?)
-//  `;
-//    db.query(
-//        insertSql,
-//        [userId, doctorId, appointmentId, content, rating],
-//        (err, result) => {
-//            if (err) {
-//                console.error('插入评价失败:', err);
-//                return res.status(500).json({ error: '插入评价失败' });
-//            }
-
-//            // 2. 评价插入成功后，给 users.review_count +1
-//            const updateSql = `
-//                SELECT u.id, u.username, u.title, u.expertise, u.working_years,
-//                COUNT(r.id) AS review_count
-//                FROM users u
-//                LEFT JOIN reviews r ON u.id = r.doctor_id
-//                WHERE u.role = '心理医生'
-//                GROUP BY u.id
-//            `;
-//            db.query(updateSql, [doctorId], (err2) => {
-//                if (err2) {
-//                    console.error('更新医生评价数失败:', err2);
-//                    // 评价已经写入，可以还是返回 success，让前端继续
-//                    return res.json({ success: true });
-//                }
-//                // 全部成功
-//                res.json({ success: true });
-//            });
-//        }
-//    );
-//});
-
+//提交评论
 app.post('/api/reviews', (req, res) => {
     const { userId, doctorId, appointmentId } = req.body;
     const rating = parseInt(req.body.rating, 10);

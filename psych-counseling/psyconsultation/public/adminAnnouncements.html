@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>管理员后台 - 公告管理</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootswatch/4.5.2/cosmo/bootstrap.min.css">
+</head>
+<body>
+    <!-- 登录检查 + 与 admin.html 一致的导航 -->
+    <script>
+    if (!localStorage.getItem('isAdmin')) location.href='adminLogin.html';
+    </script>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <a class="navbar-brand" href="admin.html">管理员后台</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navAdmin"
+                aria-controls="navAdmin" aria-expanded="false" aria-label="切换导航">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navAdmin">
+            <ul class="navbar-nav mr-auto">
+                <!-- ... 其他菜单项 ... -->
+                <li class="nav-item"><a class="nav-link" href="adminAnnouncements.html">公告管理</a></li>
+            </ul>
+            <ul class="navbar-nav ml-auto">
+                <li class="nav-item"><a class="nav-link" href="#" id="adminLogoutBtn">退出</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container my-5">
+        <h2 class="text-center mb-4">系统公告管理</h2>
+
+        <!-- 新增公告 -->
+        <form id="addForm" class="form-inline mb-4">
+            <input type="text" id="newTitle" class="form-control mr-2" placeholder="标题" required>
+            <input type="text" id="newContent" class="form-control mr-2" placeholder="内容" required>
+            <button class="btn btn-success">新增</button>
+        </form>
+
+        <!-- 公告列表 -->
+        <table class="table table-bordered" id="announceTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>标题</th>
+                    <th>内容</th>
+                    <th>创建时间</th>
+                    <th>更新时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <!-- Bootstrap + jQuery -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+    <script>
+    // 加载公告
+    async function loadAnnouncements() {
+      const res = await fetch('/api/announcements');
+      const data = await res.json();
+      const tbody = document.querySelector('#announceTable tbody');
+      tbody.innerHTML = '';
+      data.forEach(a => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${a.id}</td>
+          <td><input class="form-control title-input" data-id="${a.id}" value="${a.title}"></td>
+          <td><input class="form-control content-input" data-id="${a.id}" value="${a.content}"></td>
+          <td>${new Date(a.created_at).toLocaleString()}</td>
+          <td>${new Date(a.updated_at).toLocaleString()}</td>
+          <td>
+            <button class="btn btn-primary btn-sm save-btn" data-id="${a.id}">保存</button>
+            <button class="btn btn-danger btn-sm del-btn" data-id="${a.id}">删除</button>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+      // 绑定事件
+      document.querySelectorAll('.save-btn').forEach(b => b.onclick = saveAnnouncement);
+      document.querySelectorAll('.del-btn').forEach(b => b.onclick  = deleteAnnouncement);
+    }
+
+    // 新增
+    document.getElementById('addForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const title   = document.getElementById('newTitle').value.trim();
+      const content = document.getElementById('newContent').value.trim();
+      if (!title || !content) return;
+      await fetch('/api/announcements', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ title, content })
+      });
+      document.getElementById('newTitle').value = '';
+      document.getElementById('newContent').value = '';
+      loadAnnouncements();
+    });
+
+    // 保存（更新）
+    async function saveAnnouncement() {
+      const id      = this.dataset.id;
+      const title   = document.querySelector(`.title-input[data-id="${id}"]`).value;
+      const content = document.querySelector(`.content-input[data-id="${id}"]`).value;
+      await fetch(`/api/announcements/${id}`, {
+        method: 'PUT',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ title, content })
+      });
+      loadAnnouncements();
+    }
+
+    // 删除
+    async function deleteAnnouncement() {
+      const id = this.dataset.id;
+      if (!confirm('确认删除？')) return;
+      await fetch(`/api/announcements/${id}`, { method: 'DELETE' });
+      loadAnnouncements();
+    }
+
+    // 管理员退出
+    document.getElementById('adminLogoutBtn').onclick = e => {
+      e.preventDefault();
+      localStorage.removeItem('isAdmin');
+      location.href = 'adminLogin.html';
+    };
+
+    document.addEventListener('DOMContentLoaded', loadAnnouncements);
+    </script>
+</body>
+</html>

@@ -153,7 +153,7 @@ app.post('/api/changePassword', (req, res) => {
 });
 
 
-//获取心理语录列表
+//获取心理语录列表，用于首页
 app.get('/api/quote', (req, res) => {
     if (req.query.id) {
         // 如果传入 id 参数，则查询对应语录的完整记录
@@ -181,6 +181,17 @@ app.get('/api/quote', (req, res) => {
             res.json({ quote: results[0].content });
         });
     }
+});
+
+//用于管理员获取全部语录
+app.get('/api/quotes', (req, res) => {
+    db.query('SELECT id, content FROM quotes ORDER BY id DESC', (err, results) => {
+        if (err) {
+            console.error('查询语录列表失败:', err);
+            return res.status(500).json({ error: '查询语录列表失败' });
+        }
+        res.json(results);
+    });
 });
 
 //添加心理语录

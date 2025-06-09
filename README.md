@@ -1,4 +1,4 @@
-````markdown
+
 # 心理咨询在线平台（Psychological Counseling Platform）
 
 > 一个基于 WebSocket 的在线心理咨询系统，集成用户注册登录、图文文章浏览、匿名留言墙、预约管理、实时聊天、医生评价和管理员后台等功能。  

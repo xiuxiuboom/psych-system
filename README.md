@@ -46,9 +46,10 @@
 ## 🚀 本地开发 & 运行指南
 
 1. **克隆仓库**  
-   ```bash
-   git clone https://github.com/yourname/psych-counseling.git
-   cd psych-counseling
+ ```bash
+ git clone https://github.com/yourname/psych-counseling.git
+ cd psych-counseling
+   
 ````
 
 2. **数据库准备**
